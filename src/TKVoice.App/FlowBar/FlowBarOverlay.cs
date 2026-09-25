@@ -15,6 +15,8 @@ internal sealed class FlowBarOverlay(FlowBarWindow window) : IUserNotifier
 
     public void ShowError(string message) => _dispatcher.BeginInvoke(() => window.ShowError(message));
 
+    public void SetHandsFree(bool handsFree) => _dispatcher.BeginInvoke(() => window.SetHandsFree(handsFree));
+
     public void ShowInfo(string message) => _dispatcher.BeginInvoke(() => window.ShowMessage(message, isError: false));
 
     public void ShowModeChanged(ProcessingMode mode) => _dispatcher.BeginInvoke(() => window.ShowMessage(

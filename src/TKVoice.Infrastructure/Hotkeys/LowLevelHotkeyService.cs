@@ -10,7 +10,9 @@ namespace TKVoice.Infrastructure.Hotkeys;
 /// Global hotkeys via a low-level keyboard hook, which (unlike RegisterHotKey) reports key releases
 /// as needed for push-to-talk. The hook runs on its own message-loop thread and only enqueues key
 /// events; matching and event dispatch happen on a separate worker thread so the hook never stalls
-/// system-wide keyboard input. Keys are passed through, never swallowed.
+/// system-wide keyboard input. Modifier keys are always passed through; a non-modifier key that
+/// completes a hotkey (e.g. Space in "RightCtrl+Space") is swallowed so it does not reach the
+/// application.
 /// </summary>
 public sealed class LowLevelHotkeyService : IHotkeyService
 {
@@ -19,6 +21,10 @@ public sealed class LowLevelHotkeyService : IHotkeyService
     private readonly ILog _log;
     private readonly HotkeyMatcher _matcher = new();
     private readonly HashSet<int> _suspectedStuckKeys = new();
+
+    // Hook thread only.
+    private readonly HashSet<int> _swallowed = new();
+    private volatile HotkeyGesture[] _gestures = [];
     private readonly BlockingCollection<KeyEvent> _events = new();
     private readonly NativeMethods.LowLevelKeyboardProc _hookProc;
     private Thread? _hookThread;
@@ -37,6 +43,7 @@ public sealed class LowLevelHotkeyService : IHotkeyService
 
     public void Register(HotkeyAction action, HotkeyGesture gesture)
     {
+        _gestures = [.. _gestures, gesture];
         _events.Add(new KeyEvent.Register(action, gesture));
     }
 
@@ -106,13 +113,53 @@ public sealed class LowLevelHotkeyService : IHotkeyService
                 var isUp = message is NativeMethods.WM_KEYUP or NativeMethods.WM_SYSKEYUP;
                 if (isDown || isUp)
                 {
-                    _events.TryAdd(new KeyEvent.Key((int)data.vkCode, isDown));
+                    var vk = (int)data.vkCode;
+                    _events.TryAdd(new KeyEvent.Key(vk, isDown));
+                    if (ShouldSwallow(vk, isDown))
+                    {
+                        return 1;
+                    }
                 }
             }
         }
 
         return NativeMethods.CallNextHookEx(0, nCode, wParam, lParam);
     }
+
+    /// <summary>Runs on the hook thread; must stay cheap.</summary>
+    private bool ShouldSwallow(int vk, bool isDown)
+    {
+        if (!isDown)
+        {
+            return _swallowed.Remove(vk);
+        }
+
+        if (IsModifier(vk))
+        {
+            return false;
+        }
+
+        if (_swallowed.Contains(vk))
+        {
+            return true; // auto-repeat of a swallowed key
+        }
+
+        // The other keys' physical state is authoritative (tracking our own state could get stuck
+        // after a missed key-up); the key being pressed is not yet reflected there.
+        foreach (var gesture in _gestures)
+        {
+            if (gesture.AllKeys.Contains(vk)
+                && gesture.Parts.All(part => part.Any(k => k == vk || NativeMethods.IsKeyPhysicallyDown(k))))
+            {
+                _swallowed.Add(vk);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsModifier(int vk) => vk is >= 0xA0 and <= 0xA5 or 0x10 or 0x11 or 0x12 or 0x5B or 0x5C;
 
     private void DispatchLoop()
     {

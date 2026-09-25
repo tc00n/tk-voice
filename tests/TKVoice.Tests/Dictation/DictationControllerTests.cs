@@ -193,6 +193,112 @@ public class DictationControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Hands_free_hotkey_starts_and_stops_a_recording()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Freihändig diktiert.";
+
+        controller.OnHotkeyPressed(HotkeyAction.HandsFreeToggle);
+        Assert.Equal(DictationState.Recording, controller.State);
+        Assert.Equal([true], _notifier.HandsFree);
+
+        _audio.Emit(OneSecondOfAudio);
+        controller.OnHotkeyPressed(HotkeyAction.HandsFreeToggle);
+        await controller.ProcessingCompletion;
+
+        Assert.Equal("Freihändig diktiert.", _insertion.Inserted.Single().Text);
+    }
+
+    [Fact]
+    public async Task Push_to_talk_can_be_locked_into_hands_free_and_stopped_by_a_tap()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Lange Aufnahme.";
+
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
+        controller.OnHotkeyPressed(HotkeyAction.HandsFreeToggle); // RightCtrl+Space
+        controller.OnHotkeyReleased(HotkeyAction.PushToTalk);
+        _audio.Emit(OneSecondOfAudio);
+        Assert.Equal(DictationState.Recording, controller.State);
+        Assert.Equal([false, true], _notifier.HandsFree);
+
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk); // tap to stop
+        controller.OnHotkeyReleased(HotkeyAction.PushToTalk);
+        await controller.ProcessingCompletion;
+
+        Assert.Equal("Lange Aufnahme.", _insertion.Inserted.Single().Text);
+        Assert.Equal(DictationState.Idle, controller.State);
+    }
+
+    [Fact]
+    public async Task Silence_timeout_stops_hands_free_recording()
+    {
+        _settings.Audio.HandsFreeSilenceTimeoutSeconds = 2;
+        var controller = CreateController();
+        _transcription.Result = "Text.";
+
+        controller.OnHotkeyPressed(HotkeyAction.HandsFreeToggle);
+        _audio.Emit(Tone(TimeSpan.FromSeconds(1)));
+        for (var i = 0; i < 25; i++)
+        {
+            _audio.Emit(new byte[AudioFormat.BytesPerSecond / 10]); // 2.5 s of silence
+        }
+
+        await WaitUntilAsync(() => controller.State != DictationState.Recording);
+        await controller.ProcessingCompletion;
+        Assert.Equal("Text.", _insertion.Inserted.Single().Text);
+    }
+
+    [Fact]
+    public void Silence_timeout_does_not_stop_push_to_talk()
+    {
+        _settings.Audio.HandsFreeSilenceTimeoutSeconds = 1;
+        var controller = CreateController();
+
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
+        for (var i = 0; i < 30; i++)
+        {
+            _audio.Emit(new byte[AudioFormat.BytesPerSecond / 10]);
+        }
+
+        Assert.Equal(DictationState.Recording, controller.State);
+    }
+
+    [Fact]
+    public void Speech_pause_commits_a_transcription_segment()
+    {
+        var controller = CreateController();
+
+        controller.OnHotkeyPressed(HotkeyAction.HandsFreeToggle);
+        _audio.Emit(Tone(TimeSpan.FromSeconds(11)));
+        _audio.Emit(new byte[AudioFormat.BytesPerSecond]);
+
+        Assert.Equal(1, _transcription.Session!.SegmentCommits);
+    }
+
+    private static byte[] Tone(TimeSpan duration)
+    {
+        var samples = (int)(duration.TotalSeconds * AudioFormat.SampleRate);
+        var bytes = new byte[samples * 2];
+        for (var i = 0; i < samples; i++)
+        {
+            BitConverter.TryWriteBytes(bytes.AsSpan(i * 2), (short)(i % 2 == 0 ? 8000 : -8000));
+        }
+
+        return bytes;
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        for (var i = 0; i < 200 && !condition(); i++)
+        {
+            await Task.Delay(10);
+        }
+
+        Assert.True(condition());
+    }
+
+    [Fact]
     public void Toggle_hotkey_switches_mode_and_informs_user()
     {
         var controller = CreateController();
@@ -351,7 +457,11 @@ public class DictationControllerTests : IDisposable
         public long AppendedBytes { get; private set; }
         public bool Disposed { get; private set; }
 
+        public int SegmentCommits { get; private set; }
+
         public void AppendAudio(ReadOnlyMemory<byte> pcm) => AppendedBytes += pcm.Length;
+
+        public void CommitSegment() => SegmentCommits++;
 
         public Task<string> CompleteAsync(CancellationToken cancellationToken) =>
             owner.Error is null ? Task.FromResult(owner.Result) : Task.FromException<string>(owner.Error);
@@ -423,6 +533,9 @@ public class DictationControllerTests : IDisposable
 
         public List<ProcessingMode> Modes { get; } = [];
         public List<string> Infos { get; } = [];
+        public List<bool> HandsFree { get; } = [];
+
+        public void SetHandsFree(bool handsFree) => HandsFree.Add(handsFree);
 
         public void ShowInfo(string message) => Infos.Add(message);
 

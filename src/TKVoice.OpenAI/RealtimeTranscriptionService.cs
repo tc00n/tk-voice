@@ -48,14 +48,21 @@ public sealed class RealtimeTranscriptionService : ITranscriptionService
             Keywords: _keywords(),
             Prompt: null);
 
-        var session = new RealtimeTranscriptionSession(
-            _transportFactory(apiKey),
-            options,
-            TimeSpan.FromSeconds(_settings.ConnectTimeoutSeconds),
-            TimeSpan.FromMilliseconds(_settings.TrailingSilenceMilliseconds),
+        return new RotatingTranscriptionSession(
+            () =>
+            {
+                var session = new RealtimeTranscriptionSession(
+                    _transportFactory(apiKey),
+                    options,
+                    TimeSpan.FromSeconds(_settings.ConnectTimeoutSeconds),
+                    TimeSpan.FromMilliseconds(_settings.TrailingSilenceMilliseconds),
+                    _log);
+                session.Start();
+                _log.Debug($"Transcription session started with model {_settings.TranscriptionModel}.");
+                return session;
+            },
+            TimeSpan.FromMinutes(_settings.SessionRotationMinutes),
+            TimeSpan.FromMinutes(_settings.SessionRotationMinutes + 5),
             _log);
-        session.Start();
-        _log.Debug($"Transcription session started with model {_settings.TranscriptionModel}.");
-        return session;
     }
 }

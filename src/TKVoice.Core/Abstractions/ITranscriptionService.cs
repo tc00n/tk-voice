@@ -14,6 +14,12 @@ public interface ITranscriptionSession : IAsyncDisposable
     /// <summary>Queues a chunk of PCM audio. Thread-safe and non-blocking.</summary>
     void AppendAudio(ReadOnlyMemory<byte> pcm);
 
+    /// <summary>
+    /// Finalizes the audio so far as a segment (at a speech pause) so it is transcribed while the
+    /// user keeps speaking. No-op if nothing was appended since the last segment.
+    /// </summary>
+    void CommitSegment();
+
     /// <summary>Signals end of audio and waits for the final transcript of everything appended.</summary>
     Task<string> CompleteAsync(CancellationToken cancellationToken);
 }

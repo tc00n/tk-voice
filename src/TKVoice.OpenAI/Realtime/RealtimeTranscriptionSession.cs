@@ -6,8 +6,9 @@ namespace TKVoice.OpenAI.Realtime;
 
 /// <summary>
 /// One dictation's streaming transcription. Audio is queued immediately and sent once the
-/// WebSocket is connected, so recording never waits for the network. Turn detection is off:
-/// the client commits once at the end of the recording and waits for the final transcript.
+/// WebSocket is connected, so recording never waits for the network. Turn detection is off: the
+/// client commits segments at speech pauses (so long dictations are transcribed while speaking) and
+/// once at the end, then waits until every commit is acknowledged and transcribed.
 /// Text is assembled from every item the server reports, in order of first appearance, so a
 /// server-side split into several items cannot drop speech. Completed transcripts win over deltas.
 /// </summary>
@@ -27,8 +28,9 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
     private readonly Dictionary<string, StringBuilder> _deltaText = [];
     private long _audioBytesAppended;
     private bool _commitRequested;
-    private bool _commitWasEmpty;
-    private bool _audioAppended;
+    private bool _audioSinceCommit;
+    private int _commitsSent;
+    private int _commitsAcknowledged;
     private Task _run = Task.CompletedTask;
 
     public RealtimeTranscriptionSession(
@@ -49,12 +51,35 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
 
     public void AppendAudio(ReadOnlyMemory<byte> pcm)
     {
-        if (!pcm.IsEmpty)
+        if (pcm.IsEmpty)
         {
-            Volatile.Write(ref _audioAppended, true);
-            Interlocked.Add(ref _audioBytesAppended, pcm.Length);
-            _outgoing.Writer.TryWrite(RealtimeProtocol.AppendAudio(pcm.Span));
+            return;
         }
+
+        var message = RealtimeProtocol.AppendAudio(pcm.Span);
+        lock (_gate)
+        {
+            _audioSinceCommit = true;
+            _audioBytesAppended += pcm.Length;
+            _outgoing.Writer.TryWrite(message);
+        }
+    }
+
+    public void CommitSegment()
+    {
+        lock (_gate)
+        {
+            if (!_audioSinceCommit || _commitRequested)
+            {
+                return;
+            }
+
+            _audioSinceCommit = false;
+            _commitsSent++;
+            _outgoing.Writer.TryWrite(RealtimeProtocol.Commit());
+        }
+
+        _log.Debug("Segment committed.");
     }
 
     public async Task<string> CompleteAsync(CancellationToken cancellationToken)
@@ -62,19 +87,26 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         lock (_gate)
         {
             _commitRequested = true;
+            if (_audioSinceCommit)
+            {
+                // Recording stops the instant the hotkey is released. A short silent tail gives the
+                // model context to finalize a word that was still being spoken.
+                if (_trailingSilence > TimeSpan.Zero)
+                {
+                    var silenceBytes = (int)(_trailingSilence.TotalSeconds * AudioFormat.BytesPerSecond) & ~1;
+                    _outgoing.Writer.TryWrite(RealtimeProtocol.AppendAudio(new byte[silenceBytes]));
+                }
+
+                _audioSinceCommit = false;
+                _commitsSent++;
+                _outgoing.Writer.TryWrite(RealtimeProtocol.Commit());
+            }
+
+            _log.Debug($"Final commit: {_audioBytesAppended} bytes of audio in {_commitsSent} commits.");
+            _outgoing.Writer.TryComplete();
+            TryFinish();
         }
 
-        // Recording stops the instant the hotkey is released. A short silent tail gives the model
-        // context to finalize a word that was still being spoken.
-        if (Volatile.Read(ref _audioAppended) && _trailingSilence > TimeSpan.Zero)
-        {
-            var silenceBytes = (int)(_trailingSilence.TotalSeconds * AudioFormat.BytesPerSecond) & ~1;
-            _outgoing.Writer.TryWrite(RealtimeProtocol.AppendAudio(new byte[silenceBytes]));
-        }
-
-        _log.Debug($"Committing {Interlocked.Read(ref _audioBytesAppended)} bytes of audio plus {_trailingSilence.TotalMilliseconds:F0} ms silence.");
-        _outgoing.Writer.TryWrite(RealtimeProtocol.Commit());
-        _outgoing.Writer.TryComplete();
         return await _final.Task.WaitAsync(cancellationToken);
     }
 
@@ -156,6 +188,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
                 {
                     Track(committed.ItemId);
                     _committedItems.Add(committed.ItemId);
+                    _commitsAcknowledged++;
                     TryFinish();
                 }
 
@@ -192,7 +225,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
                 _log.Debug("Realtime event: commit was empty.");
                 lock (_gate)
                 {
-                    _commitWasEmpty = true;
+                    _commitsAcknowledged++;
                     TryFinish();
                 }
 
@@ -217,16 +250,13 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         }
     }
 
-    /// <summary>Resolves the final transcript once every committed item has completed. Caller holds the lock.</summary>
+    /// <summary>
+    /// Resolves the final transcript once the final commit was requested, every commit has been
+    /// acknowledged and every committed item has completed. Caller holds the lock.
+    /// </summary>
     private void TryFinish()
     {
-        if (!_commitRequested)
-        {
-            return;
-        }
-
-        var allCommittedCompleted = _committedItems.Count > 0 && _committedItems.All(_completedItems.ContainsKey);
-        if (!_commitWasEmpty && !allCommittedCompleted)
+        if (!_commitRequested || _commitsAcknowledged < _commitsSent || !_committedItems.All(_completedItems.ContainsKey))
         {
             return;
         }
@@ -238,7 +268,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         if (result.Length == 0)
         {
             _log.Warn($"Empty transcript: items={_itemOrder.Count}, committed={_committedItems.Count}, " +
-                      $"completed={_completedItems.Count}, audioBytes={Interlocked.Read(ref _audioBytesAppended)}.");
+                      $"completed={_completedItems.Count}, commits={_commitsSent}, audioBytes={_audioBytesAppended}.");
         }
 
         _final.TrySetResult(result);

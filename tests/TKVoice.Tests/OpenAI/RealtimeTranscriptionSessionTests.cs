@@ -75,14 +75,38 @@ public class RealtimeTranscriptionSessionTests
     }
 
     [Fact]
-    public async Task No_trailing_silence_without_recorded_audio()
+    public async Task Without_audio_nothing_is_committed_and_result_is_empty()
     {
         var transport = new FakeTransport();
         await using var session = Start(transport);
-        _ = session.CompleteAsync(CancellationToken.None);
 
+        Assert.Equal(string.Empty, await session.CompleteAsync(CancellationToken.None));
+        Assert.DoesNotContain("input_audio_buffer.commit", transport.SentTypes);
+    }
+
+    [Fact]
+    public async Task Segments_are_joined_and_final_waits_for_every_commit()
+    {
+        var transport = new FakeTransport();
+        await using var session = Start(transport);
+
+        session.AppendAudio(new byte[] { 1 });
+        session.CommitSegment();
+        session.CommitSegment(); // nothing new: ignored
+        session.AppendAudio(new byte[] { 2 });
+        var completion = session.CompleteAsync(CancellationToken.None);
         await transport.WaitForSentAsync("input_audio_buffer.commit");
-        Assert.Equal(["session.update", "input_audio_buffer.commit"], transport.SentTypes);
+
+        transport.Receive("""{"type":"input_audio_buffer.committed","item_id":"item_1"}""");
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_1","transcript":"Erster Teil."}""");
+        await Task.Delay(50);
+        Assert.False(completion.IsCompleted); // second commit not yet acknowledged
+
+        transport.Receive("""{"type":"input_audio_buffer.committed","item_id":"item_2"}""");
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_2","transcript":"Zweiter Teil."}""");
+
+        Assert.Equal("Erster Teil. Zweiter Teil.", await completion);
+        Assert.Equal(2, transport.SentTypes.Count(t => t == "input_audio_buffer.commit"));
     }
 
     [Fact]
@@ -90,6 +114,7 @@ public class RealtimeTranscriptionSessionTests
     {
         var transport = new FakeTransport();
         await using var session = Start(transport);
+        session.AppendAudio(new byte[] { 1 });
         var completion = session.CompleteAsync(CancellationToken.None);
 
         transport.Receive("""{"type":"error","error":{"code":"input_audio_buffer_commit_empty","message":"empty"}}""");
@@ -102,6 +127,7 @@ public class RealtimeTranscriptionSessionTests
     {
         var transport = new FakeTransport();
         await using var session = Start(transport);
+        session.AppendAudio(new byte[] { 1 });
         var completion = session.CompleteAsync(CancellationToken.None);
 
         transport.Receive("""{"type":"error","error":{"code":"invalid_api_key","message":"Incorrect API key"}}""");
@@ -115,6 +141,7 @@ public class RealtimeTranscriptionSessionTests
     {
         var transport = new FakeTransport();
         await using var session = Start(transport);
+        session.AppendAudio(new byte[] { 1 });
         var completion = session.CompleteAsync(CancellationToken.None);
 
         transport.Close();
@@ -127,6 +154,7 @@ public class RealtimeTranscriptionSessionTests
     {
         var transport = new FakeTransport { ConnectError = new IOException("offline") };
         await using var session = Start(transport);
+        session.AppendAudio(new byte[] { 1 });
 
         await Assert.ThrowsAsync<TranscriptionException>(() => session.CompleteAsync(CancellationToken.None));
     }

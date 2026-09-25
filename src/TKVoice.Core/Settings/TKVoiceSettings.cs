@@ -26,6 +26,12 @@ public sealed class HotkeySettings
     /// <summary>Switches between Smart and Raw mode (FR-039). Empty disables the hotkey.</summary>
     public string ToggleSmartRaw { get; set; } = "Ctrl+Shift+F12";
 
+    /// <summary>
+    /// Starts/stops a hands-free dictation (FR-003). With the default, add Space while holding
+    /// push-to-talk to lock the recording; tap push-to-talk to stop.
+    /// </summary>
+    public string HandsFree { get; set; } = "RightCtrl+Space";
+
     /// <summary>Adds the selected text to the personal dictionary (FR-020). Empty disables the hotkey.</summary>
     public string AddToDictionary { get; set; } = "Ctrl+Shift+F11";
 }
@@ -37,6 +43,18 @@ public sealed class AudioSettings
 
     /// <summary>Recordings shorter than this are treated as accidental taps and discarded.</summary>
     public int MinimumRecordingMilliseconds { get; set; } = 300;
+
+    /// <summary>Hands-free only: stop after this many seconds without speech. 0 disables (§46).</summary>
+    public int HandsFreeSilenceTimeoutSeconds { get; set; }
+
+    /// <summary>Input level (0..1) above which audio counts as speech for pauses and silence timeout.</summary>
+    public double SpeechLevelThreshold { get; set; } = 0.3;
+
+    /// <summary>A pause at least this long lets TK Voice finalize the speech so far as a segment.</summary>
+    public int SegmentPauseMilliseconds { get; set; } = 700;
+
+    /// <summary>Minimum segment length, so short dictations stay one segment.</summary>
+    public int MinSegmentSeconds { get; set; } = 10;
 
     public bool SoundsEnabled { get; set; } = true;
 
@@ -101,6 +119,12 @@ public sealed class OpenAISettings
 
     /// <summary>Silence appended before the final commit so the last spoken word is not cut off.</summary>
     public int TrailingSilenceMilliseconds { get; set; } = 300;
+
+    /// <summary>
+    /// Realtime sessions end after 60 minutes. Longer dictations switch to a new session at the next
+    /// speech pause after this many minutes (at the latest 5 minutes later).
+    /// </summary>
+    public int SessionRotationMinutes { get; set; } = 50;
 
     public string ResponsesUrl { get; set; } = "https://api.openai.com/v1/responses";
     public string SmartProcessingModel { get; set; } = "gpt-6-luna";

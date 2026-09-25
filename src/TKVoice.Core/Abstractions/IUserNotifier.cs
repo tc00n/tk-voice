@@ -25,6 +25,11 @@ public interface IUserNotifier
     {
     }
 
+    /// <summary>Whether the current recording is hands-free (continues without holding a key).</summary>
+    void SetHandsFree(bool handsFree)
+    {
+    }
+
     /// <summary>Short neutral message, e.g. a dictionary entry was learned.</summary>
     void ShowInfo(string message)
     {

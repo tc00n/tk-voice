@@ -11,11 +11,12 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 - Phase 2 (Target Handling): Einfügen per Zwischenablage mit Wiederherstellung des vorherigen Inhalts, Fokus auf Ursprungsfenster und -feld.
 - Phase 3 (Flow Bar): schwebende Statusanzeige unten mittig mit Wellenform, Verarbeitung, Fehlern.
 - Start-/Stoppsignale.
+- Phase 7 (Hands-free): freihändige Aufnahme ohne Längenbegrenzung, optionales Stille-Ende.
 - Phase 6 (App-Regeln): Stil je Programm – Chat knapp, E-Mail ausformuliert, Entwicklung ohne Umformulierung.
 - Phase 5 (Wörterbuch): Begriffe verbessern Erkennung und Schreibweise; lernen per Markieren + Hotkey oder Buchstabieren.
 - Phase 4 (Smart Mode): Füllwörter, Selbstkorrekturen, Zahlen, Buchstabieren, Formatierungs- und Korrekturbefehle.
 
-Noch kein Hands-free-Modus, kein Einstellungsfenster.
+Noch kein Einstellungsfenster, Retry-Logik folgt in Phase 8.
 
 ## Voraussetzungen
 
@@ -37,6 +38,8 @@ Beim ersten Start fragt TK Voice nach dem OpenAI API Key und speichert ihn im Wi
 ## Bedienung
 
 - **Push-to-talk:** rechte Strg-Taste halten, sprechen, loslassen.
+- **Freihändig:** rechte Strg halten und Leertaste dazu drücken → Aufnahme läuft ohne Halten weiter. Beenden mit einem Tipp auf rechte Strg.
+  Optional automatisches Ende nach Stille: `Audio.HandsFreeSilenceTimeoutSeconds` in `settings.json`.
 - **Smart/Raw umschalten:** `Strg+Umschalt+F12` oder Tray-Menü. Smart bereinigt und formatiert, Raw fügt das Transkript unverändert ein.
 - **Wörterbuch:** Begriff markieren + `Strg+Umschalt+F11`, oder beim Diktieren buchstabieren („NEONEX, geschrieben N-E-O-N-E-X“). Pflege über Tray → „Wörterbuch …“.
 - Das Diktat wird eingefügt (Strg+V); die vorherige Zwischenablage ist danach wieder da. Ein Strg+Z im Zielprogramm entfernt das ganze Diktat.

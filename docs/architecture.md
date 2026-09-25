@@ -43,8 +43,7 @@ Die Solution liegt im neuen Format `TKVoice.slnx`.
   die Aufnahme wartet nie auf das Netzwerk.
 - Modell, URL, `delay` und Sprachhinweise (`languages`) stehen in `settings.json`. `keywords` und `prompt`
   sind im Protokoll vorbereitet (Wörterbuch, Phase 5).
-- Offen für Phase 7: lange Hands-free-Diktate brauchen Segmentierung mit Commit bei Sprechpausen;
-  eine etwaige maximale Session-Dauer ist zu prüfen und ggf. per Session-Wechsel zu umgehen.
+- Lange Diktate: siehe ADR-015 (Segmentierung, Session-Rotation).
 
 ## ADR-004 – Texteingabe per `SendInput` Unicode (Phase 1, abgelöst durch ADR-009)
 
@@ -174,3 +173,26 @@ Gemessen (10 Akzeptanzbeispiele, warm): Smart-Schritt 0,85–1,3 s. Zusammen mit
 
 Verifiziert mit der API: dasselbe Diktat wird in Outlook zur Mail mit Anrede/Absätzen/Gruß, in VS Code
 bleiben Bezeichner erhalten („getUserById“, „README.md“), in Teams bleibt es ein knapper Chat-Text.
+
+## ADR-015 – Hands-free und lange Diktate (Phase 7)
+
+- Bedienung: `RightCtrl+Space` startet freihändig bzw. „verriegelt“ ein laufendes Push-to-talk (rechte
+  Strg halten, Leertaste dazu, loslassen); ein Tipp auf rechte Strg oder erneut `RightCtrl+Space` beendet.
+  Die Flow Bar zeigt „Freihändig · m:ss“.
+- Hotkey-Tasten, die keine Modifier sind (Space, F11, F12 …), werden im Hook verschluckt, wenn sie einen
+  Hotkey vervollständigen – sonst landet z. B. das Leerzeichen im Text. Entscheidung über den physischen
+  Tastenzustand (`GetAsyncKeyState`), damit verpasste Key-ups nichts dauerhaft blockieren.
+- **Segmentierung (§45):** Pegelbasierte Pausenerkennung (`SpeechActivityTracker`). Nach ≥ 10 s Audio und
+  ≥ 700 ms Pause wird ein Segment committet; es wird transkribiert, während weitergesprochen wird. Gilt auch
+  für Push-to-talk → lange Diktate haben nach dem Loslassen nur noch das letzte Segment offen.
+  Die Session zählt gesendete Commits vs. Bestätigungen (`committed`/`commit_empty`) und liefert das Ergebnis
+  erst, wenn alle bestätigt und transkribiert sind.
+- **Speicher:** Audio wird nie gesammelt; Chunks gehen direkt in die WebSocket-Queue.
+- **Session-Limit (60 min):** `RotatingTranscriptionSession` wechselt nach 50 min an der nächsten Pause auf
+  eine neue Session, spätestens nach 55 min auch ohne Pause. Frühere Sessions werden im Hintergrund
+  abgeschlossen, der Text in Reihenfolge zusammengesetzt.
+- **Stille-Ende (§46):** nur Hands-free, `Audio.HandsFreeSilenceTimeoutSeconds` (0 = aus, Standard, da die
+  Spec es als aktivierbare Option beschreibt). Push-to-talk wird nie durch Stille beendet.
+
+Verifiziert mit synthetischer Sprache (Windows TTS, 19,6 s) gegen die API: 5 Segment-Commits während des
+Streamens, vollständiger Text in korrekter Reihenfolge, Ergebnis 0,7 s nach Stopp.

@@ -96,6 +96,7 @@ public partial class App : Application
         _hotkeys.Released += (_, action) => controller.OnHotkeyReleased(action);
 
         var pushToTalk = RegisterHotkey(HotkeyAction.PushToTalk, settings.Hotkeys.PushToTalk, new HotkeySettings().PushToTalk);
+        RegisterHotkey(HotkeyAction.HandsFreeToggle, settings.Hotkeys.HandsFree, fallback: null);
         RegisterHotkey(HotkeyAction.ToggleSmartRaw, settings.Hotkeys.ToggleSmartRaw, fallback: null);
         RegisterHotkey(HotkeyAction.AddToDictionary, settings.Hotkeys.AddToDictionary, fallback: null);
         _hotkeys.Start();

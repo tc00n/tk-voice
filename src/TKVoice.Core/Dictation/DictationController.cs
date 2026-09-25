@@ -74,7 +74,16 @@ public sealed class DictationController
         switch (action)
         {
             case HotkeyAction.PushToTalk:
-                StartRecording();
+                // In hands-free mode a tap on push-to-talk ends the recording.
+                if (!StopHandsFree())
+                {
+                    StartRecording(handsFree: false);
+                }
+
+                break;
+
+            case HotkeyAction.HandsFreeToggle:
+                ToggleHandsFree();
                 break;
 
             case HotkeyAction.ToggleSmartRaw:
@@ -87,13 +96,61 @@ public sealed class DictationController
 
     public void OnHotkeyReleased(HotkeyAction action)
     {
-        if (action == HotkeyAction.PushToTalk)
+        if (action != HotkeyAction.PushToTalk)
         {
-            StopRecording();
+            return;
+        }
+
+        ActiveDictation? pushToTalk;
+        lock (_gate)
+        {
+            pushToTalk = _current is { HandsFree: false } ? _current : null;
+        }
+
+        if (pushToTalk is not null)
+        {
+            StopRecording(pushToTalk);
         }
     }
 
-    private void StartRecording()
+    /// <summary>
+    /// Idle: start a hands-free dictation. Push-to-talk recording: lock it into hands-free, so it
+    /// continues after the key is released. Hands-free recording: stop.
+    /// </summary>
+    private void ToggleHandsFree()
+    {
+        if (StopHandsFree())
+        {
+            return;
+        }
+
+        lock (_gate)
+        {
+            if (_current is { HandsFree: false } pushToTalk)
+            {
+                pushToTalk.HandsFree = true;
+                _log.Info("Recording locked to hands-free.");
+                _notifier.SetHandsFree(true);
+                return;
+            }
+        }
+
+        StartRecording(handsFree: true);
+    }
+
+    /// <summary>Stops the current recording if it is hands-free. Returns whether it did.</summary>
+    private bool StopHandsFree()
+    {
+        ActiveDictation? handsFree;
+        lock (_gate)
+        {
+            handsFree = _current is { HandsFree: true } ? _current : null;
+        }
+
+        return handsFree is not null && StopRecording(handsFree);
+    }
+
+    private void StartRecording(bool handsFree)
     {
         lock (_gate)
         {
@@ -122,7 +179,18 @@ public sealed class DictationController
                 return;
             }
 
-            var dictation = new ActiveDictation(target, session, _mode.Current, _notifier);
+            var dictation = new ActiveDictation(
+                target,
+                session,
+                _mode.Current,
+                handsFree,
+                _notifier,
+                new SpeechActivityTracker(
+                    _settings.Audio.SpeechLevelThreshold,
+                    TimeSpan.FromMilliseconds(_settings.Audio.SegmentPauseMilliseconds),
+                    TimeSpan.FromSeconds(_settings.Audio.MinSegmentSeconds),
+                    TimeSpan.FromSeconds(_settings.Audio.HandsFreeSilenceTimeoutSeconds)));
+            dictation.SilenceTimeoutReached += OnSilenceTimeout;
             try
             {
                 _audio.Start(dictation.OnAudio);
@@ -142,25 +210,32 @@ public sealed class DictationController
             {
                 _smartProcessor.Warmup();
             }
-            _log.Info($"Recording started ({dictation.Mode}). Target: {target}.");
+            _log.Info($"Recording started ({dictation.Mode}{(handsFree ? ", hands-free" : string.Empty)}). Target: {target}.");
         }
 
         _notifier.SetState(DictationState.Recording);
+        _notifier.SetHandsFree(handsFree);
     }
 
-    private void StopRecording()
+    /// <summary>Raised on the audio thread, which must not wait for itself to stop.</summary>
+    private void OnSilenceTimeout(ActiveDictation dictation)
     {
-        ActiveDictation dictation;
+        _log.Info($"Hands-free recording stopped after {_settings.Audio.HandsFreeSilenceTimeoutSeconds} s of silence.");
+        _ = Task.Run(() => StopRecording(dictation));
+    }
+
+    /// <summary>Stops <paramref name="dictation"/> if it is still the one recording. Returns whether it did.</summary>
+    private bool StopRecording(ActiveDictation dictation)
+    {
         lock (_gate)
         {
-            if (_state != DictationState.Recording || _current is null)
+            if (_state != DictationState.Recording || !ReferenceEquals(_current, dictation))
             {
-                return;
+                return false;
             }
 
             _audio.Stop();
             _sounds.PlayRecordingStopped();
-            dictation = _current;
             _current = null;
             _state = DictationState.Processing;
             ProcessingCompletion = Task.Run(() => ProcessAsync(dictation));
@@ -168,6 +243,7 @@ public sealed class DictationController
 
         _log.Info($"Recording stopped after {dictation.AudioDuration.TotalSeconds:F1} s of audio.");
         _notifier.SetState(DictationState.Processing);
+        return true;
     }
 
     private async Task ProcessAsync(ActiveDictation dictation)
@@ -302,12 +378,29 @@ public sealed class DictationController
         }
     }
 
-    private sealed class ActiveDictation(DictationTarget target, ITranscriptionSession session, ProcessingMode mode, IUserNotifier notifier)
+    private sealed class ActiveDictation(
+        DictationTarget target,
+        ITranscriptionSession session,
+        ProcessingMode mode,
+        bool handsFree,
+        IUserNotifier notifier,
+        SpeechActivityTracker speechActivity)
     {
         private long _audioBytes;
+        private volatile bool _handsFree = handsFree;
+        private bool _silenceTimeoutRaised;
+
+        public event Action<ActiveDictation>? SilenceTimeoutReached;
 
         public DictationTarget Target { get; } = target;
         public ProcessingMode Mode { get; } = mode;
+
+        public bool HandsFree
+        {
+            get => _handsFree;
+            set => _handsFree = value;
+        }
+
         public ITranscriptionSession Session { get; } = session;
         public TimeSpan AudioDuration => AudioFormat.DurationOf(Interlocked.Read(ref _audioBytes));
 
@@ -315,7 +408,21 @@ public sealed class DictationController
         {
             Interlocked.Add(ref _audioBytes, pcm.Length);
             Session.AppendAudio(pcm);
-            notifier.ReportAudioLevel(AudioLevel.Compute(pcm.Span));
+
+            var level = AudioLevel.Compute(pcm.Span);
+            notifier.ReportAudioLevel(level);
+
+            var activity = speechActivity.OnChunk(level, AudioFormat.DurationOf(pcm.Length));
+            if (activity.CommitSegment)
+            {
+                Session.CommitSegment();
+            }
+
+            if (activity.SilenceTimeoutReached && HandsFree && !_silenceTimeoutRaised)
+            {
+                _silenceTimeoutRaised = true;
+                SilenceTimeoutReached?.Invoke(this);
+            }
         }
     }
 }

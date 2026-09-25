@@ -36,6 +36,9 @@ public partial class FlowBarWindow : Window
     private Screen? _screen;
     private double _animationPhase;
     private string? _pendingInfo;
+    private bool _handsFree;
+    private DateTimeOffset _recordingStarted;
+    private readonly DispatcherTimer _handsFreeClock;
 
     public FlowBarWindow()
     {
@@ -62,6 +65,8 @@ public partial class FlowBarWindow : Window
         _slowProcessing.Stop();
         _errorHide = new DispatcherTimer(ErrorDisplayDuration, DispatcherPriority.Normal, (_, _) => HideAfterError(), Dispatcher);
         _errorHide.Stop();
+        _handsFreeClock = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Normal, (_, _) => ShowHandsFreeStatus(), Dispatcher);
+        _handsFreeClock.Stop();
 
         SizeChanged += (_, _) => Reposition();
 
@@ -69,9 +74,30 @@ public partial class FlowBarWindow : Window
         new WindowInteropHelper(this).EnsureHandle();
     }
 
+    /// <summary>Hands-free recordings show a label with elapsed time, since no key is being held.</summary>
+    public void SetHandsFree(bool handsFree)
+    {
+        _handsFree = handsFree && _state == DictationState.Recording;
+        if (_handsFree)
+        {
+            ShowHandsFreeStatus();
+            _handsFreeClock.Start();
+        }
+        else
+        {
+            _handsFreeClock.Stop();
+        }
+    }
+
     public void SetState(DictationState state)
     {
         _state = state;
+        if (state != DictationState.Recording)
+        {
+            _handsFree = false;
+            _handsFreeClock.Stop();
+        }
+
         switch (state)
         {
             case DictationState.Recording:
@@ -83,12 +109,14 @@ public partial class FlowBarWindow : Window
                 RenderLevels();
                 Dot.Fill = RecordingBrush;
                 Bars.Visibility = Visibility.Visible;
+                _recordingStarted = DateTimeOffset.Now;
                 SetStatus(null);
                 ShowOnTargetMonitor();
                 break;
 
             case DictationState.Processing:
                 Dot.Fill = ProcessingBrush;
+                SetStatus(null);
                 _animationPhase = 0;
                 _processingAnimation.Start();
                 _slowProcessing.Start();
@@ -180,6 +208,15 @@ public partial class FlowBarWindow : Window
         }
 
         RenderLevels();
+    }
+
+    private void ShowHandsFreeStatus()
+    {
+        if (_handsFree)
+        {
+            var elapsed = DateTimeOffset.Now - _recordingStarted;
+            SetStatus($"Freihändig · {(int)elapsed.TotalMinutes}:{elapsed.Seconds:00}");
+        }
     }
 
     private void ShowSlowHint()
