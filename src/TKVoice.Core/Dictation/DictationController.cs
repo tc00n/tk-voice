@@ -99,7 +99,7 @@ public sealed class DictationController
                 return;
             }
 
-            var dictation = new ActiveDictation(target, session);
+            var dictation = new ActiveDictation(target, session, _notifier);
             try
             {
                 _audio.Start(dictation.OnAudio);
@@ -194,7 +194,7 @@ public sealed class DictationController
         }
     }
 
-    private sealed class ActiveDictation(DictationTarget target, ITranscriptionSession session)
+    private sealed class ActiveDictation(DictationTarget target, ITranscriptionSession session, IUserNotifier notifier)
     {
         private long _audioBytes;
 
@@ -206,6 +206,7 @@ public sealed class DictationController
         {
             Interlocked.Add(ref _audioBytes, pcm.Length);
             Session.AppendAudio(pcm);
+            notifier.ReportAudioLevel(AudioLevel.Compute(pcm.Span));
         }
     }
 }

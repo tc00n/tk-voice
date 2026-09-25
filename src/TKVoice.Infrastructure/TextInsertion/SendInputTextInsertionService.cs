@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using TKVoice.Core.Abstractions;
 using TKVoice.Infrastructure.Native;
@@ -22,15 +23,22 @@ public sealed class SendInputTextInsertionService(ILog log) : ITextInsertionServ
             return InsertionResult.TargetUnavailable;
         }
 
+        var stopwatch = Stopwatch.StartNew();
+
         // Held modifiers would turn the typed characters into shortcuts (e.g. Ctrl+Enter).
         await WaitForModifiersReleasedAsync(cancellationToken);
+        var modifiersMs = stopwatch.ElapsedMilliseconds;
 
         if (!await EnsureForegroundAsync(target.WindowHandle, cancellationToken))
         {
             return InsertionResult.TargetUnavailable;
         }
 
+        var focusMs = stopwatch.ElapsedMilliseconds - modifiersMs;
+
         TypeText(text);
+        var typingMs = stopwatch.ElapsedMilliseconds - modifiersMs - focusMs;
+        log.Info($"Insertion timing: modifiers {modifiersMs} ms, focus {focusMs} ms, typing {typingMs} ms.");
         return InsertionResult.Inserted;
     }
 

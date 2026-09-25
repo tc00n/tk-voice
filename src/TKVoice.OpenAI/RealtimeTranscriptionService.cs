@@ -48,6 +48,7 @@ public sealed class RealtimeTranscriptionService : ITranscriptionService
             _transportFactory(apiKey),
             options,
             TimeSpan.FromSeconds(_settings.ConnectTimeoutSeconds),
+            TimeSpan.FromMilliseconds(_settings.TrailingSilenceMilliseconds),
             _log);
         session.Start();
         _log.Debug($"Transcription session started with model {_settings.TranscriptionModel}.");

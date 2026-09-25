@@ -44,6 +44,9 @@ public sealed class OpenAISettings
     public List<string> Languages { get; set; } = ["de", "en"];
 
     public int ConnectTimeoutSeconds { get; set; } = 10;
+
+    /// <summary>Silence appended before the final commit so the last spoken word is not cut off.</summary>
+    public int TrailingSilenceMilliseconds { get; set; } = 300;
 }
 
 public sealed class DiagnosticsSettings

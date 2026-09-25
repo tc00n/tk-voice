@@ -7,8 +7,10 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 
 ## Stand
 
-Phase 1 (Vertical Slice): Push-to-talk → Mikrofon → OpenAI Realtime Transcription → Texteingabe ins Ursprungsfenster.
-Noch kein Smart Processing, keine Flow Bar, kein Einstellungsfenster.
+- Phase 1 (Vertical Slice): Push-to-talk → Mikrofon → OpenAI Realtime Transcription → Texteingabe ins Ursprungsfenster.
+- Phase 3 (Flow Bar) vorgezogen: schwebende Statusanzeige unten mittig mit Wellenform, Verarbeitung, Fehlern.
+
+Noch kein Smart Processing, kein Einstellungsfenster.
 
 ## Voraussetzungen
 
@@ -30,6 +32,7 @@ Beim ersten Start fragt TK Voice nach dem OpenAI API Key und speichert ihn im Wi
 ## Bedienung
 
 - **Push-to-talk:** rechte Strg-Taste halten, sprechen, loslassen.
+- Flow Bar unten mittig: roter Punkt + Wellenform = Aufnahme, oranger Punkt + Lauflicht = Verarbeitung.
 - Tray-Icon: blau = bereit, rot = Aufnahme, orange = Verarbeitung.
 
 ## Dateien

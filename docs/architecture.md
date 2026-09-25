@@ -65,3 +65,21 @@ Nie in `settings.json`, nie in Logs.
 
 Eigener minimaler Datei-Logger, tägliche Datei unter `%LOCALAPPDATA%\TK Voice\logs`. Geloggt werden
 Zustände, Latenzen, Zeichenanzahlen und Fehlercodes – nie Audio, Transkripte, eingefügter Text oder Keys.
+
+## ADR-007 – Flow Bar als nicht aktivierbares WPF-Overlay (Phase 3 vorgezogen)
+
+Ohne sichtbares Feedback war beim ersten Test unklar, ob die Aufnahme läuft (das Tray-Icon liegt unter
+Windows 11 meist im Überlauf). Deshalb wurde Phase 3 vor Phase 2 umgesetzt.
+
+- Rahmenloses, transparentes WPF-Fenster mit `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT`,
+  `ShowActivated=False`: stiehlt nie den Fokus, ist klick-durchlässig, erscheint nicht in Taskleiste/Alt+Tab.
+- Position unten mittig auf dem Monitor des Zielfensters, in physischen Pixeln (DPI-korrekt).
+- Wellenform aus dem RMS-Pegel jedes 50-ms-Audioblocks (dB-Skala, `AudioLevel`).
+- Verarbeitung > 3 s zeigt „Verarbeitung dauert länger …“ (FR-033); Fehler werden 4 s angezeigt.
+- `IUserNotifier` wird per `CompositeNotifier` an Tray-Icon und Flow Bar verteilt.
+
+## ADR-008 – Stille-Nachlauf vor dem Commit
+
+Die Aufnahme endet beim Loslassen sofort (FR-002). Vor dem Commit werden 300 ms Stille angehängt
+(`OpenAI.TrailingSilenceMilliseconds`), damit das Modell ein beim Loslassen noch gesprochenes Wort
+abschließen kann. Kostet keine spürbare Latenz.

@@ -1,4 +1,5 @@
 using System.Windows;
+using TKVoice.App.FlowBar;
 using TKVoice.Core.Abstractions;
 using TKVoice.Core.Dictation;
 using TKVoice.Core.Hotkeys;
@@ -47,13 +48,14 @@ public partial class App : Application
 
         var credentials = new WindowsCredentialService();
         _tray = new TrayIcon(credentials, _log);
+        var notifier = new CompositeNotifier(_tray, new FlowBarOverlay(new FlowBarWindow()));
 
         var controller = new DictationController(
             new WaveInAudioCaptureService(settings.Audio.InputDeviceNumber, _log),
             new RealtimeTranscriptionService(settings.OpenAI, credentials, _log),
             new ForegroundWindowTargetCaptureService(_log),
             new SendInputTextInsertionService(_log),
-            _tray,
+            notifier,
             _log,
             settings);
 

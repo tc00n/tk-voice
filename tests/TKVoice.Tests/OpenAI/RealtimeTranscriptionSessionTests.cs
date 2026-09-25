@@ -19,7 +19,8 @@ public class RealtimeTranscriptionSessionTests
         var completion = session.CompleteAsync(CancellationToken.None);
 
         await transport.WaitForSentAsync("input_audio_buffer.commit");
-        Assert.Equal(["session.update", "input_audio_buffer.append", "input_audio_buffer.commit"], transport.SentTypes);
+        Assert.Equal(["session.update", "input_audio_buffer.append", "input_audio_buffer.append", "input_audio_buffer.commit"], transport.SentTypes);
+        Assert.Equal(300 * 48, transport.AppendedBytes[^1]); // trailing silence: 300 ms at 48 000 bytes/s
 
         transport.Receive("""{"type":"input_audio_buffer.committed","item_id":"item_1","previous_item_id":null}""");
         transport.Receive("""{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_1","transcript":" Hallo Welt. "}""");
@@ -39,6 +40,17 @@ public class RealtimeTranscriptionSessionTests
         transport.Receive("""{"type":"input_audio_buffer.committed","item_id":"item_1"}""");
 
         Assert.Equal("Test", await completion);
+    }
+
+    [Fact]
+    public async Task No_trailing_silence_without_recorded_audio()
+    {
+        var transport = new FakeTransport();
+        await using var session = Start(transport);
+        _ = session.CompleteAsync(CancellationToken.None);
+
+        await transport.WaitForSentAsync("input_audio_buffer.commit");
+        Assert.Equal(["session.update", "input_audio_buffer.commit"], transport.SentTypes);
     }
 
     [Fact]
@@ -89,7 +101,7 @@ public class RealtimeTranscriptionSessionTests
 
     private static RealtimeTranscriptionSession Start(FakeTransport transport)
     {
-        var session = new RealtimeTranscriptionSession(transport, Options, TimeSpan.FromSeconds(5), new NullLog());
+        var session = new RealtimeTranscriptionSession(transport, Options, TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(300), new NullLog());
         session.Start();
         return session;
     }
@@ -109,6 +121,21 @@ public class RealtimeTranscriptionSessionTests
                 lock (_sent)
                 {
                     return _sent.Select(m => JsonDocument.Parse(m).RootElement.GetProperty("type").GetString()!).ToList();
+                }
+            }
+        }
+
+        public List<int> AppendedBytes
+        {
+            get
+            {
+                lock (_sent)
+                {
+                    return _sent
+                        .Select(m => JsonDocument.Parse(m).RootElement)
+                        .Where(e => e.GetProperty("type").GetString() == "input_audio_buffer.append")
+                        .Select(e => Convert.FromBase64String(e.GetProperty("audio").GetString()!).Length)
+                        .ToList();
                 }
             }
         }

@@ -12,6 +12,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
 {
     private readonly IRealtimeTransport _transport;
     private readonly TimeSpan _connectTimeout;
+    private readonly TimeSpan _trailingSilence;
     private readonly ILog _log;
     private readonly Channel<string> _outgoing = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true });
     private readonly CancellationTokenSource _cts = new();
@@ -21,12 +22,19 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
     private readonly Dictionary<string, string> _completedItems = [];
     private bool _commitRequested;
     private bool _commitWasEmpty;
+    private bool _audioAppended;
     private Task _run = Task.CompletedTask;
 
-    public RealtimeTranscriptionSession(IRealtimeTransport transport, TranscriptionSessionOptions options, TimeSpan connectTimeout, ILog log)
+    public RealtimeTranscriptionSession(
+        IRealtimeTransport transport,
+        TranscriptionSessionOptions options,
+        TimeSpan connectTimeout,
+        TimeSpan trailingSilence,
+        ILog log)
     {
         _transport = transport;
         _connectTimeout = connectTimeout;
+        _trailingSilence = trailingSilence;
         _log = log;
         _outgoing.Writer.TryWrite(RealtimeProtocol.SessionUpdate(options));
     }
@@ -37,6 +45,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
     {
         if (!pcm.IsEmpty)
         {
+            Volatile.Write(ref _audioAppended, true);
             _outgoing.Writer.TryWrite(RealtimeProtocol.AppendAudio(pcm.Span));
         }
     }
@@ -46,6 +55,14 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         lock (_gate)
         {
             _commitRequested = true;
+        }
+
+        // Recording stops the instant the hotkey is released. A short silent tail gives the model
+        // context to finalize a word that was still being spoken.
+        if (Volatile.Read(ref _audioAppended) && _trailingSilence > TimeSpan.Zero)
+        {
+            var silenceBytes = (int)(_trailingSilence.TotalSeconds * AudioFormat.BytesPerSecond) & ~1;
+            _outgoing.Writer.TryWrite(RealtimeProtocol.AppendAudio(new byte[silenceBytes]));
         }
 
         _outgoing.Writer.TryWrite(RealtimeProtocol.Commit());

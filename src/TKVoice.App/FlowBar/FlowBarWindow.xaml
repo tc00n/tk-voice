@@ -1,0 +1,39 @@
+<Window x:Class="TKVoice.App.FlowBar.FlowBarWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TK Voice Flow Bar"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        SizeToContent="WidthAndHeight"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True"
+        Focusable="False"
+        IsHitTestVisible="False">
+    <Border x:Name="Pill"
+            Margin="10"
+            Padding="14,8"
+            CornerRadius="18"
+            Background="#F21C1C1E"
+            BorderBrush="#33FFFFFF"
+            BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.35" />
+        </Border.Effect>
+        <StackPanel Orientation="Horizontal">
+            <Ellipse x:Name="Dot" Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,10,0" />
+            <StackPanel x:Name="Bars" Orientation="Horizontal" Height="24" VerticalAlignment="Center" />
+            <TextBlock x:Name="StatusText"
+                       Margin="10,0,0,0"
+                       MaxWidth="340"
+                       VerticalAlignment="Center"
+                       FontFamily="Segoe UI"
+                       FontSize="12"
+                       Foreground="#E6FFFFFF"
+                       TextTrimming="CharacterEllipsis"
+                       Visibility="Collapsed" />
+        </StackPanel>
+    </Border>
+</Window>
