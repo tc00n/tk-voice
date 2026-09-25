@@ -158,3 +158,19 @@ Gemessen (10 Akzeptanzbeispiele, warm): Smart-Schritt 0,85–1,3 s. Zusammen mit
   „KUHN“), sonst die Buchstabenfolge. Abschaltbar: `Dictionary.LearnSpelledTerms`.
 - Pflege über Tray → „Wörterbuch …“ (später Teil des Einstellungsfensters).
 - Logs enthalten nur die Länge neuer Begriffe, nie den Begriff selbst.
+
+## ADR-014 – App-spezifische Regeln (Phase 6)
+
+- `AppRules` in `settings.json`: Name, Prozessnamen (ohne `.exe`), Stilanweisung. Defaults: Chat
+  (Teams, Slack, WhatsApp, …), E-Mail (Outlook klassisch/neu, Thunderbird), Dokument (Word, OneNote,
+  Notion, Obsidian), Präsentation (PowerPoint), Entwicklung (VS Code, Cursor, Visual Studio, JetBrains,
+  Terminals, Claude). Eigene Liste ersetzt die Defaults vollständig.
+- Die Stilanweisung wird als eigene Zeile in den Smart-Input gegeben; sie steuert Ton und Eingriffstiefe,
+  überstimmt aber nie explizite Diktatbefehle oder das Verbot, Inhalte hinzuzufügen.
+- Kontext bleibt auf Prozessname + Beschreibung der EXE („Microsoft Outlook (OUTLOOK)“) beschränkt
+  (FR-022/023). Browser haben keine Regel, da die Website ohne Fenstertitel unbekannt ist.
+- `settings.json` wird beim Start mit allen aktuellen Optionen zurückgeschrieben (neue Optionen erscheinen
+  mit Default, Benutzerwerte bleiben), Umlaute unescaped für manuelles Bearbeiten.
+
+Verifiziert mit der API: dasselbe Diktat wird in Outlook zur Mail mit Anrede/Absätzen/Gruß, in VS Code
+bleiben Bezeichner erhalten („getUserById“, „README.md“), in Teams bleibt es ein knapper Chat-Text.

@@ -56,6 +56,9 @@ internal static class SmartProcessingPrompt
           ("drei Punkte").
         - English: "twenty five percent" → "25%", "three thousand two hundred dollars" → "$3,200".
 
+        A "Style for this application" line in the input adjusts tone and amount of editing for the target
+        application. It never overrides explicit dictation commands or the rules against adding content.
+
         Output contract:
         - Output only the final text. No preface such as "Here is", no quotes around it, no comments,
           no Markdown code fences, no Markdown emphasis or headings.
@@ -70,6 +73,11 @@ internal static class SmartProcessingPrompt
         if (!string.IsNullOrWhiteSpace(request.WindowTitle))
         {
             input.AppendLine($"Window title: {request.WindowTitle}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.AppStyle))
+        {
+            input.AppendLine($"Style for this application: {request.AppStyle}");
         }
 
         if (vocabulary.Count > 0)

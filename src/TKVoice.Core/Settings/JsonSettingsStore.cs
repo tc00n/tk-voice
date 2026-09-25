@@ -7,24 +7,28 @@ public sealed class JsonSettingsStore(string filePath)
     private static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         ReadCommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true,
     };
 
     public string FilePath { get; } = filePath;
 
-    /// <summary>Loads settings, writing a default file first if none exists.</summary>
+    /// <summary>
+    /// Loads settings and writes them back, so the file always lists every option, including ones
+    /// added in newer versions (with their defaults).
+    /// </summary>
     public TKVoiceSettings LoadOrCreate()
     {
-        if (!File.Exists(FilePath))
+        var settings = new TKVoiceSettings();
+        if (File.Exists(FilePath))
         {
-            var defaults = new TKVoiceSettings();
-            Save(defaults);
-            return defaults;
+            using var stream = File.OpenRead(FilePath);
+            settings = JsonSerializer.Deserialize<TKVoiceSettings>(stream, Options) ?? settings;
         }
 
-        using var stream = File.OpenRead(FilePath);
-        return JsonSerializer.Deserialize<TKVoiceSettings>(stream, Options) ?? new TKVoiceSettings();
+        Save(settings);
+        return settings;
     }
 
     public void Save(TKVoiceSettings settings)

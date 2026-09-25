@@ -60,6 +60,33 @@ public class DictationControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task App_rule_style_and_display_name_are_passed_to_smart_processing()
+    {
+        _targetCapture.Target = new DictationTarget(0x42, 1, "OUTLOOK") { ApplicationDescription = "Microsoft Outlook" };
+        var controller = CreateController();
+        _transcription.Result = "Ähm, wir sehen uns morgen.";
+        _smart.Output = "Wir sehen uns morgen.";
+
+        await DictateAsync(controller);
+
+        var request = _smart.Requests.Single();
+        Assert.Equal("Microsoft Outlook (OUTLOOK)", request.ApplicationName);
+        Assert.StartsWith("E-mail.", request.AppStyle);
+    }
+
+    [Fact]
+    public async Task Applications_without_rule_get_no_style()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Ähm, wir sehen uns morgen.";
+        _smart.Output = "Wir sehen uns morgen.";
+
+        await DictateAsync(controller);
+
+        Assert.Null(_smart.Requests.Single().AppStyle);
+    }
+
+    [Fact]
     public async Task Raw_mode_inserts_transcript_without_smart_processing()
     {
         var controller = CreateController();

@@ -251,10 +251,13 @@ public sealed class DictationController
         try
         {
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.Processing.SmartTimeoutSeconds));
+            var rule = AppRule.Find(_settings.AppRules, dictation.Target.ProcessName);
             var request = new TextProcessingRequest(
                 transcript,
-                dictation.Target.ProcessName,
-                _settings.Processing.SendWindowTitle ? dictation.Target.WindowTitle : null);
+                dictation.Target.DisplayName,
+                _settings.Processing.SendWindowTitle ? dictation.Target.WindowTitle : null,
+                rule?.Style);
+            _log.Debug($"App rule: {rule?.Name ?? "none"}.");
             var output = await _smartProcessor.ProcessAsync(request, timeout.Token);
             _log.Info($"Smart processing took {(DateTimeOffset.UtcNow - started).TotalMilliseconds:F0} ms ({transcript.Length} → {output.Length} chars).");
 

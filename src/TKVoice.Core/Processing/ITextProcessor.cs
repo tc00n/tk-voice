@@ -5,9 +5,10 @@ namespace TKVoice.Core.Processing;
 /// the target application, other windows or the clipboard.
 /// </summary>
 /// <param name="Transcript">Final transcript of the dictation.</param>
-/// <param name="ApplicationName">Process name of the target application, e.g. "OUTLOOK".</param>
+/// <param name="ApplicationName">Target application, e.g. "Microsoft Outlook (OUTLOOK)".</param>
 /// <param name="WindowTitle">Only set when explicitly enabled in the settings.</param>
-public sealed record TextProcessingRequest(string Transcript, string ApplicationName, string? WindowTitle = null);
+/// <param name="AppStyle">Style guidance from the matching app rule, if any (FR-024).</param>
+public sealed record TextProcessingRequest(string Transcript, string ApplicationName, string? WindowTitle = null, string? AppStyle = null);
 
 /// <summary>Turns a final transcript into the text to insert (Smart processing, §42/§43).</summary>
 public interface ISmartTextProcessor

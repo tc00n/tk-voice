@@ -36,6 +36,16 @@ public class SmartProcessingTests
     }
 
     [Fact]
+    public void Input_contains_app_style_when_a_rule_matches()
+    {
+        var input = SmartProcessingPrompt.BuildInput(
+            new TextProcessingRequest("Hallo", "Microsoft Outlook (OUTLOOK)", AppStyle: "E-mail. Complete sentences."), []);
+
+        Assert.Contains("Target application: Microsoft Outlook (OUTLOOK)", input);
+        Assert.Contains("Style for this application: E-mail. Complete sentences.", input);
+    }
+
+    [Fact]
     public void Parses_output_text_from_message_items_and_skips_reasoning()
     {
         const string json = """

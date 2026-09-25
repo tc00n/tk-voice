@@ -22,9 +22,11 @@ public sealed class ForegroundWindowTargetCaptureService(bool captureWindowTitle
             return null;
         }
 
-        return new DictationTarget(hwnd, (int)processId, GetProcessName((int)processId), GetFocusedControl(threadId))
+        var (processName, description) = GetProcessInfo((int)processId);
+        return new DictationTarget(hwnd, (int)processId, processName, GetFocusedControl(threadId))
         {
             WindowTitle = captureWindowTitle ? GetWindowTitle(hwnd) : null,
+            ApplicationDescription = description,
         };
     }
 
@@ -46,16 +48,26 @@ public sealed class ForegroundWindowTargetCaptureService(bool captureWindowTitle
         return NativeMethods.GetGUIThreadInfo(threadId, ref info) ? info.hwndFocus : 0;
     }
 
-    private static string GetProcessName(int processId)
+    private static (string Name, string? Description) GetProcessInfo(int processId)
     {
         try
         {
             using var process = Process.GetProcessById(processId);
-            return process.ProcessName;
+            string? description = null;
+            try
+            {
+                // Not accessible for elevated processes; the process name is enough then.
+                description = process.MainModule?.FileVersionInfo.FileDescription?.Trim();
+            }
+            catch (Exception)
+            {
+            }
+
+            return (process.ProcessName, string.IsNullOrEmpty(description) ? null : description);
         }
         catch (Exception)
         {
-            return "unknown";
+            return ("unknown", null);
         }
     }
 }

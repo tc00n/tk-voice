@@ -10,6 +10,12 @@ public sealed record DictationTarget(nint WindowHandle, int ProcessId, string Pr
     /// <summary>Only captured when enabled in the settings. Never logged: titles can contain e-mail subjects etc.</summary>
     public string? WindowTitle { get; init; }
 
+    /// <summary>Human-readable application name from the executable's version info, e.g. "Microsoft Outlook".</summary>
+    public string? ApplicationDescription { get; init; }
+
+    /// <summary>"Microsoft Outlook (OUTLOOK)", or just the process name if there is no description.</summary>
+    public string DisplayName => string.IsNullOrWhiteSpace(ApplicationDescription) ? ProcessName : $"{ApplicationDescription} ({ProcessName})";
+
     public override string ToString() => $"{ProcessName} (pid {ProcessId}, hwnd 0x{WindowHandle:X}, focus 0x{FocusHandle:X})";
 }
 

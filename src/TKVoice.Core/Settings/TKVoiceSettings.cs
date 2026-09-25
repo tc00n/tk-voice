@@ -1,3 +1,5 @@
+using TKVoice.Core.Processing;
+
 namespace TKVoice.Core.Settings;
 
 /// <summary>
@@ -10,6 +12,9 @@ public sealed class TKVoiceSettings
     public ProcessingSettings Processing { get; set; } = new();
     public InsertionSettings Insertion { get; set; } = new();
     public DictionarySettings Dictionary { get; set; } = new();
+
+    /// <summary>App-specific smart processing styles (FR-024), matched by process name.</summary>
+    public List<AppRule> AppRules { get; set; } = AppRule.Defaults();
     public OpenAISettings OpenAI { get; set; } = new();
     public DiagnosticsSettings Diagnostics { get; set; } = new();
 }

@@ -25,6 +25,34 @@ public class JsonSettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Existing_file_is_completed_with_new_options_and_keeps_user_values()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "settings.json");
+        File.WriteAllText(path, """{ "Hotkeys": { "PushToTalk": "Ctrl+Win" } }""");
+
+        var settings = new JsonSettingsStore(path).LoadOrCreate();
+
+        Assert.Equal("Ctrl+Win", settings.Hotkeys.PushToTalk);
+        Assert.NotEmpty(settings.AppRules);
+        var written = File.ReadAllText(path);
+        Assert.Contains("AppRules", written);
+        Assert.Contains("Präsentation", written); // umlauts stay readable for manual editing
+    }
+
+    [Fact]
+    public void User_app_rules_replace_the_defaults()
+    {
+        Directory.CreateDirectory(_directory);
+        var path = Path.Combine(_directory, "settings.json");
+        File.WriteAllText(path, """{ "AppRules": [ { "Name": "Mail", "Processes": ["OUTLOOK"], "Style": "Kurz." } ] }""");
+
+        var settings = new JsonSettingsStore(path).LoadOrCreate();
+
+        Assert.Equal("Mail", settings.AppRules.Single().Name);
+    }
+
+    [Fact]
     public void Settings_file_contains_no_api_key_field()
     {
         var store = new JsonSettingsStore(Path.Combine(_directory, "settings.json"));
