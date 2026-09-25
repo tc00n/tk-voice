@@ -1,0 +1,22 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <!--
+    Builds the TK Voice MSI from the self-contained publish output.
+    Use build\Build-Installer.ps1, which publishes the app first and passes PublishDir.
+  -->
+  <PropertyGroup>
+    <OutputName>TKVoice-$(Version)-x64</OutputName>
+    <Platform>x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <PublishDir Condition="'$(PublishDir)' == ''">$(MSBuildThisFileDirectory)..\artifacts\publish\</PublishDir>
+    <!-- PublishDir comes from the command line as a global property and cannot be modified here. -->
+    <HarvestDir>$([MSBuild]::EnsureTrailingSlash('$(PublishDir)'))</HarvestDir>
+    <DefineConstants>PublishDir=$(HarvestDir);ProductVersion=$(Version);AssetsDir=$(MSBuildThisFileDirectory)..\assets\</DefineConstants>
+    <!--
+      ICE38/43/57 assume ProgramMenuFolder is per-user. With Scope="perMachine" (ALLUSERS=1) it is the
+      all-users Start menu, so a per-machine registry KeyPath is correct. ICE61: same-version upgrades.
+    -->
+    <SuppressIces>ICE38;ICE43;ICE57;ICE61</SuppressIces>
+  </PropertyGroup>
+
+</Project>

@@ -8,6 +8,7 @@
     <AssemblyName>TKVoice</AssemblyName>
     <RootNamespace>TKVoice.App</RootNamespace>
     <AssemblyTitle>TK Voice</AssemblyTitle>
+    <ApplicationIcon>..\..\assets\TKVoice.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

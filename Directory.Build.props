@@ -6,6 +6,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Company>TK Voice</Company>
     <Product>TK Voice</Product>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 </Project>

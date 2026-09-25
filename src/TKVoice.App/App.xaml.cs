@@ -45,6 +45,12 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        if (InstallerCommands.TryRun(e.Args))
+        {
+            Shutdown();
+            return;
+        }
+
         _singleInstance = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var isFirstInstance);
         if (!isFirstInstance)
         {
@@ -52,6 +58,8 @@ public partial class App : Application
             Shutdown();
             return;
         }
+
+        InstallerCommands.ListenForQuit(() => Dispatcher.BeginInvoke(Shutdown));
 
         _store = new JsonSettingsStore(AppPaths.SettingsFile);
         _settings = _store.LoadOrCreate();

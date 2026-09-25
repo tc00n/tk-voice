@@ -1,0 +1,69 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!--
+    TK Voice installer (NFR-008): per-machine install to C:\Program Files\TK Voice, Start menu entry,
+    listed under Apps for a clean uninstall, major upgrades for manually installed new versions.
+    The UpgradeCode must never change.
+  -->
+  <Package Name="TK Voice"
+           Manufacturer="Tim Kuhn"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="6F1C8E2A-3B7D-4C59-9A0E-5D2B7F4E1A36"
+           Scope="perMachine"
+           Language="1031"
+           Codepage="1252">
+
+    <SummaryInformation Description="TK Voice – persönliche Diktier-App für Windows" />
+
+    <MajorUpgrade DowngradeErrorMessage="Eine neuere Version von TK Voice ist bereits installiert."
+                  Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="TKVoiceIcon" SourceFile="$(var.AssetsDir)TKVoice.ico" />
+    <Property Id="ARPPRODUCTICON" Value="TKVoiceIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/tc00n/tk-voice" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="TK Voice">
+        <!-- Everything from the self-contained publish output, including the .NET runtime. -->
+        <Files Include="$(var.PublishDir)**" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Component Id="StartMenuShortcut">
+        <Shortcut Id="TKVoiceShortcut"
+                  Name="TK Voice"
+                  Description="Diktieren per Hotkey"
+                  Target="[INSTALLFOLDER]TKVoice.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="TKVoiceIcon" />
+        <RegistryValue Root="HKLM" Key="Software\TK Voice" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+
+    <!--
+      Before files are replaced or removed, a running TK Voice is asked to quit (it would lock its
+      files). On a real uninstall (not an upgrade) it also removes its autostart entry, logs and
+      debug data. Both run as the user, since they concern the user's session and profile.
+      Return="ignore": on a first install there is no TKVoice.exe yet.
+    -->
+    <CustomAction Id="QuitRunningInstance"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]TKVoice.exe&quot; --quit"
+                  Execute="immediate"
+                  Return="ignore" />
+    <CustomAction Id="UninstallCleanup"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="&quot;[INSTALLFOLDER]TKVoice.exe&quot; --uninstall"
+                  Execute="immediate"
+                  Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="UninstallCleanup" Before="InstallValidate"
+              Condition="Installed AND REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <!-- Unconditional: on an upgrade the new package is not "Installed" yet, but the old exe is running. -->
+      <Custom Action="QuitRunningInstance" After="UninstallCleanup" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

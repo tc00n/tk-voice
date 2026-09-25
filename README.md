@@ -11,6 +11,7 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 - Phase 2 (Target Handling): Einfügen per Zwischenablage mit Wiederherstellung des vorherigen Inhalts, Fokus auf Ursprungsfenster und -feld.
 - Phase 3 (Flow Bar): schwebende Statusanzeige unten mittig mit Wellenform, Verarbeitung, Fehlern.
 - Start-/Stoppsignale.
+- Phase 11 (Auslieferung): Installer `TKVoice-1.0.0-x64.msi` mit Startmenü-Eintrag und sauberer Deinstallation.
 - Phase 10 (Sicherheit & Diagnose): Passwortfeld-Sperre, Kostenübersicht mit Monatsbudget, Debug-Modus.
 - Phase 9 (Einstellungen & Tray): Einstellungsfenster, Pausieren, Autostart, Hotkeys per Tastendruck.
 - Phase 8 (Zuverlässigkeit): automatische Wiederholung bei Netzwerk-/Serverfehlern ohne Diktatverlust, klare Fehlermeldungen, Mikrofonausfall.
@@ -19,7 +20,7 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 - Phase 5 (Wörterbuch): Begriffe verbessern Erkennung und Schreibweise; lernen per Markieren + Hotkey oder Buchstabieren.
 - Phase 4 (Smart Mode): Füllwörter, Selbstkorrekturen, Zahlen, Buchstabieren, Formatierungs- und Korrekturbefehle.
 
-Offen: Installer (Phase 11).
+Alle MVP-Phasen umgesetzt; Abgleich mit den Akzeptanzkriterien: [docs/acceptance.md](docs/acceptance.md).
 
 ## Voraussetzungen
 
@@ -27,7 +28,19 @@ Offen: Installer (Phase 11).
 - .NET 10 SDK
 - OpenAI API Key
 
-## Bauen, testen, starten
+## Installieren
+
+`artifacts\TKVoice-<Version>-x64.msi` doppelklicken (Administratorrechte nötig). Installiert nach
+`C:\Program Files\TK Voice\` mit Startmenü-Eintrag „TK Voice“; die .NET-Runtime ist enthalten.
+Deinstallation über Einstellungen → Apps. Eine neue Version wird einfach über die alte installiert.
+
+Installer bauen (Tests, Release-Publish, MSI):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build\Build-Installer.ps1
+```
+
+## Bauen, testen, starten (Entwicklung)
 
 ```powershell
 dotnet build TKVoice.slnx

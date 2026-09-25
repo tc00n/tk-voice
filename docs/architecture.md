@@ -277,3 +277,22 @@ erreichbarer Server → 3 Versuche mit Replay, klare Fehlermeldung nach 2,6 s.
   Transkript und eingefügten Text in `%LOCALAPPDATA%\TK Voice\debug\` (getrennt vom technischen Log).
   Sichtbar: „DEBUG“-Badge in der Flow Bar, Tray-Tooltip und Hinweis beim Einschalten. „Debug-Daten löschen“
   entfernt den Ordner.
+
+## ADR-020 – Auslieferung als MSI (Phase 11)
+
+- **WiX Toolset 5 als NuGet-SDK** (`installer/TKVoice.Installer.wixproj`): baut mit `dotnet build`, keine
+  globale Installation nötig. MSI, weil es sich als reguläre Anwendung unter „Apps“ einträgt und sauber
+  deinstallieren sowie per Major Upgrade aktualisieren lässt.
+- **Self-contained Publish** (win-x64, ReadyToRun): .NET-Runtime wird mitinstalliert („benötigte
+  Komponenten“), ReadyToRun verkürzt den Kaltstart des ersten Diktats. MSI ≈ 57 MB.
+- Installation pro Maschine nach `C:\Program Files\TK Voice\`, Startmenü-Eintrag „TK Voice“, Icon aus
+  `assets/TKVoice.ico` (reproduzierbar per `build/New-AppIcon.ps1`).
+- **Laufende Instanz:** Vor Installation, Upgrade und Deinstallation ruft das MSI `TKVoice.exe --quit` auf
+  (benanntes Event, Fallback: Prozess beenden), damit keine Dateien gesperrt sind.
+- **Deinstallation** (nicht beim Upgrade) ruft `TKVoice.exe --uninstall`: entfernt Autostart-Eintrag, Logs und
+  Debug-Daten. Einstellungen, Wörterbuch, Nutzungsdaten und API Key bleiben für eine Neuinstallation erhalten
+  (vollständig entfernen: `%APPDATA%\TK Voice` löschen, Credential `TKVoice/OpenAI` in der Anmeldeinformationsverwaltung).
+- ICE38/43/57 sind unterdrückt: Sie halten den Startmenü-Ordner fälschlich für benutzerbezogen; bei
+  `Scope="perMachine"` ist es das Startmenü für alle Benutzer.
+- Neue Versionen: `Version` in `Directory.Build.props` erhöhen, `build/Build-Installer.ps1` ausführen, MSI
+  installieren – ersetzt die alte Version automatisch. Die `UpgradeCode` bleibt immer gleich.
