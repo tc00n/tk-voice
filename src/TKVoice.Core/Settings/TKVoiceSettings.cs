@@ -9,6 +9,7 @@ public sealed class TKVoiceSettings
     public AudioSettings Audio { get; set; } = new();
     public ProcessingSettings Processing { get; set; } = new();
     public InsertionSettings Insertion { get; set; } = new();
+    public DictionarySettings Dictionary { get; set; } = new();
     public OpenAISettings OpenAI { get; set; } = new();
     public DiagnosticsSettings Diagnostics { get; set; } = new();
 }
@@ -19,6 +20,9 @@ public sealed class HotkeySettings
 
     /// <summary>Switches between Smart and Raw mode (FR-039). Empty disables the hotkey.</summary>
     public string ToggleSmartRaw { get; set; } = "Ctrl+Shift+F12";
+
+    /// <summary>Adds the selected text to the personal dictionary (FR-020). Empty disables the hotkey.</summary>
+    public string AddToDictionary { get; set; } = "Ctrl+Shift+F11";
 }
 
 public sealed class AudioSettings
@@ -51,6 +55,15 @@ public sealed class ProcessingSettings
 
     /// <summary>Also send the target window title as context. Off by default: titles can contain e-mail subjects etc.</summary>
     public bool SendWindowTitle { get; set; }
+}
+
+public sealed class DictionarySettings
+{
+    /// <summary>Learn terms spelled out during dictation ("NEONEX, geschrieben N-E-O-N-E-X"), FR-021.</summary>
+    public bool LearnSpelledTerms { get; set; } = true;
+
+    /// <summary>At most this many terms (the most recently added) are sent as transcription keywords.</summary>
+    public int MaxTranscriptionKeywords { get; set; } = 100;
 }
 
 public sealed class InsertionSettings

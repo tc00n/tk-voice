@@ -8,6 +8,36 @@ internal static class KeyboardInput
 {
     private const int CharactersPerBatch = 200;
 
+    private static readonly int[] ModifierKeys = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C];
+
+    /// <summary>
+    /// Waits until the user has released Shift/Ctrl/Alt/Win, which would otherwise combine with
+    /// synthesized keys (e.g. Ctrl+Shift+C opens developer tools). Returns false on timeout.
+    /// </summary>
+    public static async Task<bool> WaitForModifiersReleasedAsync(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (ModifierKeys.Any(NativeMethods.IsKeyPhysicallyDown))
+        {
+            if (DateTimeOffset.UtcNow > deadline)
+            {
+                return false;
+            }
+
+            await Task.Delay(10, cancellationToken);
+        }
+
+        return true;
+    }
+
+    public static void Copy() => Send(
+    [
+        VirtualKey(NativeMethods.VK_CONTROL, keyUp: false),
+        VirtualKey(NativeMethods.VK_C, keyUp: false),
+        VirtualKey(NativeMethods.VK_C, keyUp: true),
+        VirtualKey(NativeMethods.VK_CONTROL, keyUp: true),
+    ]);
+
     public static void Paste() => Send(
     [
         VirtualKey(NativeMethods.VK_CONTROL, keyUp: false),

@@ -21,6 +21,7 @@ internal static partial class NativeMethods
     public const ushort VK_MENU = 0x12;
     public const ushort VK_CONTROL = 0x11;
     public const ushort VK_V = 0x56;
+    public const ushort VK_C = 0x43;
 
     /// <summary>Unassigned virtual key; injecting it grants foreground rights without side effects in the target.</summary>
     public const ushort VK_UNASSIGNED = 0xE8;
@@ -247,6 +248,9 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     public static partial nint GetClipboardOwner();
+
+    [LibraryImport("user32.dll")]
+    public static partial uint GetClipboardSequenceNumber();
 
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
     public static partial uint RegisterClipboardFormatW(string lpszFormat);

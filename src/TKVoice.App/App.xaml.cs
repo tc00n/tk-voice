@@ -2,6 +2,7 @@ using System.Windows;
 using TKVoice.App.FlowBar;
 using TKVoice.Core.Abstractions;
 using TKVoice.Core.Dictation;
+using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
@@ -54,18 +55,25 @@ public partial class App : Application
         var credentials = new WindowsCredentialService();
         var mode = new ProcessingModeState(
             Enum.TryParse<ProcessingMode>(settings.Processing.DefaultMode, ignoreCase: true, out var defaultMode) ? defaultMode : ProcessingMode.Smart);
+        var dictionary = new PersonalDictionary(AppPaths.DictionaryFile);
         DictationController? controller = null;
-        _tray = new TrayIcon(credentials, mode, () => controller?.OnHotkeyPressed(HotkeyAction.ToggleSmartRaw), _log);
+        _tray = new TrayIcon(credentials, mode, () => controller?.OnHotkeyPressed(HotkeyAction.ToggleSmartRaw), dictionary, _log);
         var notifier = new CompositeNotifier(_tray, new FlowBarOverlay(new FlowBarWindow()));
 
         _clipboard = new Win32ClipboardService(SynchronizationContext.Current!, _log);
-        _smartProcessor = new OpenAISmartTextProcessor(settings.OpenAI, credentials, () => [], _log);
+        _smartProcessor = new OpenAISmartTextProcessor(settings.OpenAI, credentials, () => dictionary.Terms, _log);
+        var addToDictionary = new AddToDictionaryCommand(new ClipboardSelectionReader(_clipboard, _log), dictionary, notifier, _log);
 
         controller = new DictationController(
             new WaveInAudioCaptureService(settings.Audio.InputDeviceNumber, _log),
-            new RealtimeTranscriptionService(settings.OpenAI, credentials, _log),
+            new RealtimeTranscriptionService(
+                settings.OpenAI,
+                credentials,
+                () => dictionary.Terms.TakeLast(settings.Dictionary.MaxTranscriptionKeywords).ToList(),
+                _log),
             _smartProcessor,
             mode,
+            dictionary,
             new ForegroundWindowTargetCaptureService(settings.Processing.SendWindowTitle, _log),
             new WindowsTextInsertionService(_clipboard, settings.Insertion, _log),
             notifier,
@@ -74,11 +82,22 @@ public partial class App : Application
             settings);
 
         _hotkeys = new LowLevelHotkeyService(_log);
-        _hotkeys.Pressed += (_, action) => controller.OnHotkeyPressed(action);
+        _hotkeys.Pressed += (_, action) =>
+        {
+            if (action == HotkeyAction.AddToDictionary)
+            {
+                addToDictionary.Execute();
+            }
+            else
+            {
+                controller.OnHotkeyPressed(action);
+            }
+        };
         _hotkeys.Released += (_, action) => controller.OnHotkeyReleased(action);
 
         var pushToTalk = RegisterHotkey(HotkeyAction.PushToTalk, settings.Hotkeys.PushToTalk, new HotkeySettings().PushToTalk);
         RegisterHotkey(HotkeyAction.ToggleSmartRaw, settings.Hotkeys.ToggleSmartRaw, fallback: null);
+        RegisterHotkey(HotkeyAction.AddToDictionary, settings.Hotkeys.AddToDictionary, fallback: null);
         _hotkeys.Start();
 
         if (string.IsNullOrWhiteSpace(credentials.GetOpenAIApiKey()))

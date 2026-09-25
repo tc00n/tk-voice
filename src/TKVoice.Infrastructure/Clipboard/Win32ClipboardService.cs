@@ -106,6 +106,12 @@ public sealed class Win32ClipboardService : IDisposable
             return false;
         }
 
+        WriteSnapshot(snapshot);
+        return true;
+    });
+
+    private void WriteSnapshot(ClipboardSnapshot snapshot)
+    {
         using (OpenClipboard())
         {
             NativeMethods.EmptyClipboard();
@@ -120,7 +126,32 @@ public sealed class Win32ClipboardService : IDisposable
                 SetHistoryExclusion();
             }
         }
+    }
 
+    /// <summary>Changes whenever any application writes the clipboard.</summary>
+    public static uint SequenceNumber => NativeMethods.GetClipboardSequenceNumber();
+
+    /// <summary>Reads the plain text currently on the clipboard, or null.</summary>
+    public string? ReadText() => OnUiThread(() =>
+    {
+        using var _ = OpenClipboard();
+        var handle = NativeMethods.GetClipboardData(NativeMethods.CF_UNICODETEXT);
+        var data = handle == 0 ? null : CopyFromGlobal(handle);
+        return data is null ? null : System.Text.Encoding.Unicode.GetString(data).TrimEnd((char)0);
+    });
+
+    /// <summary>
+    /// Puts the snapshot back if the clipboard has not changed since <paramref name="sequence"/>,
+    /// i.e. nobody but the expected writer touched it. Returns whether it was restored.
+    /// </summary>
+    public bool RestoreIfSequenceUnchanged(ClipboardSnapshot snapshot, uint sequence) => OnUiThread(() =>
+    {
+        if (NativeMethods.GetClipboardSequenceNumber() != sequence)
+        {
+            return false;
+        }
+
+        WriteSnapshot(snapshot);
         return true;
     });
 

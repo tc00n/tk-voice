@@ -9,22 +9,26 @@ public sealed class RealtimeTranscriptionService : ITranscriptionService
 {
     private readonly OpenAISettings _settings;
     private readonly ICredentialService _credentials;
+    private readonly Func<IReadOnlyList<string>> _keywords;
     private readonly ILog _log;
     private readonly Func<string, IRealtimeTransport> _transportFactory;
 
-    public RealtimeTranscriptionService(OpenAISettings settings, ICredentialService credentials, ILog log)
-        : this(settings, credentials, log, apiKey => new WebSocketRealtimeTransport(new Uri(settings.RealtimeUrl), apiKey))
+    /// <param name="keywords">Personal vocabulary sent as recognition hints (FR-019).</param>
+    public RealtimeTranscriptionService(OpenAISettings settings, ICredentialService credentials, Func<IReadOnlyList<string>> keywords, ILog log)
+        : this(settings, credentials, keywords, log, apiKey => new WebSocketRealtimeTransport(new Uri(settings.RealtimeUrl), apiKey))
     {
     }
 
     internal RealtimeTranscriptionService(
         OpenAISettings settings,
         ICredentialService credentials,
+        Func<IReadOnlyList<string>> keywords,
         ILog log,
         Func<string, IRealtimeTransport> transportFactory)
     {
         _settings = settings;
         _credentials = credentials;
+        _keywords = keywords;
         _log = log;
         _transportFactory = transportFactory;
     }
@@ -41,7 +45,7 @@ public sealed class RealtimeTranscriptionService : ITranscriptionService
             _settings.TranscriptionModel,
             _settings.TranscriptionDelay,
             _settings.Languages,
-            Keywords: [],
+            Keywords: _keywords(),
             Prompt: null);
 
         var session = new RealtimeTranscriptionSession(

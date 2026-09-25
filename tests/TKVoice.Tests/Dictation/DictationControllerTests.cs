@@ -1,12 +1,13 @@
 using TKVoice.Core.Abstractions;
 using TKVoice.Core.Dictation;
+using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
 
 namespace TKVoice.Tests.Dictation;
 
-public class DictationControllerTests
+public class DictationControllerTests : IDisposable
 {
     private static readonly DictationTarget Notepad = new(0x1234, 42, "notepad");
     private static readonly byte[] OneSecondOfAudio = new byte[AudioFormat.BytesPerSecond];
@@ -19,10 +20,22 @@ public class DictationControllerTests
     private readonly FakeSounds _sounds = new();
     private readonly FakeSmartProcessor _smart = new();
     private readonly ProcessingModeState _mode = new(ProcessingMode.Smart);
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), "tkvoice-tests-" + Guid.NewGuid().ToString("N"));
+    private PersonalDictionary? _dictionary;
+
+    private PersonalDictionary Dictionary => _dictionary ??= new PersonalDictionary(Path.Combine(_directory, "dictionary.json"));
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_directory))
+        {
+            Directory.Delete(_directory, recursive: true);
+        }
+    }
     private readonly TKVoiceSettings _settings = new();
 
     private DictationController CreateController() =>
-        new(_audio, _transcription, _smart, _mode, _targetCapture, _insertion, _notifier, _sounds, new NullLog(), _settings);
+        new(_audio, _transcription, _smart, _mode, Dictionary, _targetCapture, _insertion, _notifier, _sounds, new NullLog(), _settings);
 
     private async Task DictateAsync(DictationController controller)
     {
@@ -124,6 +137,32 @@ public class DictationControllerTests
 
         Assert.Empty(_insertion.Inserted);
         Assert.Empty(_notifier.Errors);
+    }
+
+    [Fact]
+    public async Task Spelled_term_is_learned_into_dictionary()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Das Projekt heißt NEONEX, geschrieben N-E-O-N-E-X.";
+        _smart.Output = "Das Projekt heißt NEONEX.";
+
+        await DictateAsync(controller);
+
+        Assert.Equal(["NEONEX"], Dictionary.Terms);
+        Assert.Contains("NEONEX", _notifier.Infos.Single());
+    }
+
+    [Fact]
+    public async Task Learning_can_be_disabled()
+    {
+        _settings.Dictionary.LearnSpelledTerms = false;
+        var controller = CreateController();
+        _transcription.Result = "Das Projekt heißt NEONEX, geschrieben N-E-O-N-E-X.";
+        _smart.Output = "Das Projekt heißt NEONEX.";
+
+        await DictateAsync(controller);
+
+        Assert.Empty(Dictionary.Terms);
     }
 
     [Fact]
@@ -356,6 +395,9 @@ public class DictationControllerTests
         }
 
         public List<ProcessingMode> Modes { get; } = [];
+        public List<string> Infos { get; } = [];
+
+        public void ShowInfo(string message) => Infos.Add(message);
 
         public void ShowError(string message) => Errors.Add(message);
 

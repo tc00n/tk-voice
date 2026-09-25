@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Windows;
 using System.Windows.Forms;
 using TKVoice.Core.Abstractions;
+using TKVoice.Core.Dictionary;
 using TKVoice.Core.Processing;
 using TKVoice.Infrastructure;
 using Application = System.Windows.Application;
@@ -23,7 +24,7 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
     private readonly Dictionary<DictationState, Icon> _icons;
     private readonly ToolStripMenuItem _smartModeItem;
 
-    public TrayIcon(ICredentialService credentials, ProcessingModeState mode, Action toggleMode, ILog log)
+    public TrayIcon(ICredentialService credentials, ProcessingModeState mode, Action toggleMode, PersonalDictionary dictionary, ILog log)
     {
         _credentials = credentials;
         _log = log;
@@ -42,6 +43,7 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
         mode.Changed += (_, current) => OnUiThread(() => _smartModeItem.Checked = current == ProcessingMode.Smart);
         menu.Items.Add(_smartModeItem);
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Wörterbuch …", null, (_, _) => DictionaryWindow.ShowSingle(dictionary));
         menu.Items.Add("OpenAI API Key hinterlegen …", null, (_, _) => PromptForApiKey());
         menu.Items.Add("Logs öffnen", null, (_, _) => OpenLogs());
         menu.Items.Add(new ToolStripSeparator());

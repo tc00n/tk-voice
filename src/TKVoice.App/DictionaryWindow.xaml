@@ -1,0 +1,44 @@
+<Window x:Class="TKVoice.App.DictionaryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="TK Voice – Wörterbuch"
+        Width="440" Height="520" MinWidth="360" MinHeight="360"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock TextWrapping="Wrap" Margin="0,0,0,12" Foreground="#555">
+            Namen, Firmen, Produkte, Abkürzungen und Fachbegriffe in der gewünschten Schreibweise.
+            Sie helfen bei der Erkennung und werden so geschrieben.
+            Neu lernen: Begriff markieren und Strg+Umschalt+F11 drücken, oder beim Diktieren buchstabieren
+            („NEONEX, geschrieben N-E-O-N-E-X“).
+        </TextBlock>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="TermBox" Padding="4" VerticalContentAlignment="Center" />
+            <Button x:Name="SaveButton" Grid.Column="1" Content="Hinzufügen" MinWidth="96" Margin="8,0,0,0" IsDefault="True" Click="OnSave" />
+            <Button x:Name="CancelEditButton" Grid.Column="2" Content="Abbrechen" MinWidth="80" Margin="8,0,0,0" Visibility="Collapsed" Click="OnCancelEdit" />
+        </Grid>
+
+        <TextBlock x:Name="ErrorText" Grid.Row="2" Margin="0,6,0,0" Foreground="#C42B1C" TextWrapping="Wrap" Visibility="Collapsed" />
+
+        <ListBox x:Name="TermList" Grid.Row="3" Margin="0,12,0,0" MouseDoubleClick="OnEdit" SelectionChanged="OnSelectionChanged" />
+
+        <DockPanel Grid.Row="4" Margin="0,12,0,0" LastChildFill="False">
+            <TextBlock x:Name="CountText" VerticalAlignment="Center" Foreground="#555" />
+            <Button x:Name="DeleteButton" DockPanel.Dock="Right" Content="Löschen" MinWidth="90" Margin="8,0,0,0" IsEnabled="False" Click="OnDelete" />
+            <Button x:Name="EditButton" DockPanel.Dock="Right" Content="Bearbeiten" MinWidth="90" IsEnabled="False" Click="OnEdit" />
+        </DockPanel>
+    </Grid>
+</Window>

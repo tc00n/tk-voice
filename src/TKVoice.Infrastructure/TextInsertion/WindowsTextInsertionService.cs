@@ -17,7 +17,6 @@ public sealed class WindowsTextInsertionService(
     InsertionSettings settings,
     ILog log) : ITextInsertionService
 {
-    private static readonly int[] ModifierKeys = [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5, 0x5B, 0x5C];
     private static readonly TimeSpan ModifierReleaseTimeout = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan FocusSettleTimeout = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan PasteReadTimeout = TimeSpan.FromSeconds(3);
@@ -37,7 +36,11 @@ public sealed class WindowsTextInsertionService(
         var stopwatch = Stopwatch.StartNew();
 
         // Held modifiers would turn the insertion into shortcuts (e.g. Ctrl+Enter, Shift+Ctrl+V).
-        await WaitForModifiersReleasedAsync(cancellationToken);
+        if (!await KeyboardInput.WaitForModifiersReleasedAsync(ModifierReleaseTimeout, cancellationToken))
+        {
+            log.Warn("Modifier keys still held; inserting anyway.");
+        }
+
         var modifiersMs = stopwatch.ElapsedMilliseconds;
 
         if (!await EnsureForegroundAsync(target.WindowHandle, cancellationToken))
@@ -109,21 +112,6 @@ public sealed class WindowsTextInsertionService(
         catch (Exception ex)
         {
             log.Error("Restoring the clipboard failed.", ex);
-        }
-    }
-
-    private async Task WaitForModifiersReleasedAsync(CancellationToken cancellationToken)
-    {
-        var deadline = DateTimeOffset.UtcNow + ModifierReleaseTimeout;
-        while (ModifierKeys.Any(NativeMethods.IsKeyPhysicallyDown))
-        {
-            if (DateTimeOffset.UtcNow > deadline)
-            {
-                log.Warn("Modifier keys still held; inserting anyway.");
-                return;
-            }
-
-            await Task.Delay(10, cancellationToken);
         }
     }
 

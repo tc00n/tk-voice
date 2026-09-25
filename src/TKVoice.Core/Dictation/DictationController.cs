@@ -1,4 +1,5 @@
 using TKVoice.Core.Abstractions;
+using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
@@ -16,6 +17,7 @@ public sealed class DictationController
     private readonly ITranscriptionService _transcription;
     private readonly ISmartTextProcessor _smartProcessor;
     private readonly ProcessingModeState _mode;
+    private readonly PersonalDictionary _dictionary;
     private readonly ITargetCaptureService _targetCapture;
     private readonly ITextInsertionService _insertion;
     private readonly IUserNotifier _notifier;
@@ -32,6 +34,7 @@ public sealed class DictationController
         ITranscriptionService transcription,
         ISmartTextProcessor smartProcessor,
         ProcessingModeState mode,
+        PersonalDictionary dictionary,
         ITargetCaptureService targetCapture,
         ITextInsertionService insertion,
         IUserNotifier notifier,
@@ -43,6 +46,7 @@ public sealed class DictationController
         _transcription = transcription;
         _smartProcessor = smartProcessor;
         _mode = mode;
+        _dictionary = dictionary;
         _targetCapture = targetCapture;
         _insertion = insertion;
         _notifier = notifier;
@@ -201,6 +205,7 @@ public sealed class DictationController
             }
 
             _log.Info($"Text inserted. Stop-to-insert latency: {(DateTimeOffset.UtcNow - stopped).TotalMilliseconds:F0} ms.");
+            LearnSpelledTerms(transcript, text);
         }
         catch (OperationCanceledException)
         {
@@ -274,6 +279,24 @@ public sealed class DictationController
         }
 
         return transcript;
+    }
+
+    /// <summary>FR-021: explicitly spelled terms become dictionary entries.</summary>
+    private void LearnSpelledTerms(string transcript, string insertedText)
+    {
+        if (!_settings.Dictionary.LearnSpelledTerms)
+        {
+            return;
+        }
+
+        foreach (var term in SpelledTermDetector.Detect(transcript, insertedText))
+        {
+            if (_dictionary.Add(term))
+            {
+                _log.Info($"Dictionary entry learned from spelling ({term.Length} chars).");
+                _notifier.ShowInfo($"„{term}“ ins Wörterbuch übernommen");
+            }
+        }
     }
 
     private sealed class ActiveDictation(DictationTarget target, ITranscriptionSession session, ProcessingMode mode, IUserNotifier notifier)

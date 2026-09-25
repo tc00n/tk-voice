@@ -141,3 +141,20 @@ Audiodateien. Abspielen über NAudio `WaveOut`, nicht blockierend. `Audio.Sounds
 
 Gemessen (10 Akzeptanzbeispiele, warm): Smart-Schritt 0,85–1,3 s. Zusammen mit dem finalen Transkript
 (~0,6 s) liegt der Smart-Pfad bei ~1,5–2 s, der übersprungene/Raw-Pfad weiterhin bei ~0,6 s.
+
+## ADR-013 – Persönliches Wörterbuch (Phase 5)
+
+- `PersonalDictionary`: Liste von Begriffen in `%APPDATA%\TK Voice\dictionary.json`, Duplikate
+  case-insensitiv ausgeschlossen, max. 60 Zeichen, einzeilig.
+- Verwendung (FR-019): Transkription erhält die zuletzt hinzugefügten 100 Begriffe als `keywords`
+  (vom Realtime-API akzeptiert, verifiziert); Smart Processing erhält alle als Schreibvorgabe.
+- Lernen per Hotkey (FR-020, `Ctrl+Shift+F11`): wartet, bis die Hotkey-Modifier losgelassen sind, sichert
+  die Zwischenablage, sendet Strg+C, liest nur den Text und stellt die Zwischenablage wieder her.
+  Einschränkung: Das Zielprogramm legt die Kopie selbst ab, daher kann sie im Windows-Clipboard-Verlauf
+  landen. UI Automation (`TextPattern.GetSelection`) wäre ohne Zwischenablage, wird aber von vielen
+  Programmen nicht unterstützt; ggf. später als erster Versuch vor dem Kopieren.
+- Lernen beim Diktieren (FR-021): nur bei expliziten Triggern („geschrieben“, „buchstabiert“, „spelled“)
+  gefolgt von Einzelbuchstaben. Die Schreibweise wird aus dem eingefügten Text übernommen („Kuhn“ statt
+  „KUHN“), sonst die Buchstabenfolge. Abschaltbar: `Dictionary.LearnSpelledTerms`.
+- Pflege über Tray → „Wörterbuch …“ (später Teil des Einstellungsfensters).
+- Logs enthalten nur die Länge neuer Begriffe, nie den Begriff selbst.

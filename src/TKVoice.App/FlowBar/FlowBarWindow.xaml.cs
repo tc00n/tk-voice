@@ -35,6 +35,7 @@ public partial class FlowBarWindow : Window
     private DictationState _state = DictationState.Idle;
     private Screen? _screen;
     private double _animationPhase;
+    private string? _pendingInfo;
 
     public FlowBarWindow()
     {
@@ -75,6 +76,7 @@ public partial class FlowBarWindow : Window
         {
             case DictationState.Recording:
                 _errorHide.Stop();
+                _pendingInfo = null;
                 _processingAnimation.Stop();
                 _slowProcessing.Stop();
                 Array.Clear(_levels);
@@ -95,7 +97,17 @@ public partial class FlowBarWindow : Window
             case DictationState.Idle:
                 _processingAnimation.Stop();
                 _slowProcessing.Stop();
-                if (!_errorHide.IsEnabled)
+                var pending = _pendingInfo;
+                _pendingInfo = null;
+                if (_errorHide.IsEnabled)
+                {
+                    // An error from this dictation is showing; it takes precedence.
+                }
+                else if (pending is not null)
+                {
+                    ShowMessage(pending, isError: false);
+                }
+                else
                 {
                     Hide();
                 }
@@ -123,7 +135,8 @@ public partial class FlowBarWindow : Window
     {
         if (_state != DictationState.Idle && !isError)
         {
-            // Never cover the recording/processing display with informational messages.
+            // Never cover the recording/processing display; show it once the bar is free again.
+            _pendingInfo = message;
             return;
         }
 

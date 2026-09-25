@@ -24,4 +24,9 @@ public interface IUserNotifier
     void ShowModeChanged(ProcessingMode mode)
     {
     }
+
+    /// <summary>Short neutral message, e.g. a dictionary entry was learned.</summary>
+    void ShowInfo(string message)
+    {
+    }
 }
