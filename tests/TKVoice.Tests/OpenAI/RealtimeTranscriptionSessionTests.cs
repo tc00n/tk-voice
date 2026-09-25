@@ -43,6 +43,38 @@ public class RealtimeTranscriptionSessionTests
     }
 
     [Fact]
+    public async Task Text_from_earlier_items_is_kept_in_order()
+    {
+        var transport = new FakeTransport();
+        await using var session = Start(transport);
+        session.AppendAudio(new byte[] { 1 });
+
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.delta","item_id":"item_1","delta":"Erster Teil."}""");
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_1","transcript":"Erster Teil."}""");
+        var completion = session.CompleteAsync(CancellationToken.None);
+        transport.Receive("""{"type":"input_audio_buffer.committed","item_id":"item_2"}""");
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_2","transcript":"Zweiter Teil."}""");
+
+        Assert.Equal("Erster Teil. Zweiter Teil.", await completion);
+    }
+
+    [Fact]
+    public async Task Deltas_are_used_when_completed_transcript_is_empty()
+    {
+        var transport = new FakeTransport();
+        await using var session = Start(transport);
+        session.AppendAudio(new byte[] { 1 });
+        var completion = session.CompleteAsync(CancellationToken.None);
+
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.delta","item_id":"item_1","delta":"Hallo "}""");
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.delta","item_id":"item_1","delta":"Welt"}""");
+        transport.Receive("""{"type":"input_audio_buffer.committed","item_id":"item_1"}""");
+        transport.Receive("""{"type":"conversation.item.input_audio_transcription.completed","item_id":"item_1","transcript":""}""");
+
+        Assert.Equal("Hallo Welt", await completion);
+    }
+
+    [Fact]
     public async Task No_trailing_silence_without_recorded_audio()
     {
         var transport = new FakeTransport();

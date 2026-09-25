@@ -1,3 +1,4 @@
+using System.Text;
 using System.Threading.Channels;
 using TKVoice.Core.Abstractions;
 
@@ -7,6 +8,8 @@ namespace TKVoice.OpenAI.Realtime;
 /// One dictation's streaming transcription. Audio is queued immediately and sent once the
 /// WebSocket is connected, so recording never waits for the network. Turn detection is off:
 /// the client commits once at the end of the recording and waits for the final transcript.
+/// Text is assembled from every item the server reports, in order of first appearance, so a
+/// server-side split into several items cannot drop speech. Completed transcripts win over deltas.
 /// </summary>
 internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
 {
@@ -18,8 +21,11 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
     private readonly CancellationTokenSource _cts = new();
     private readonly TaskCompletionSource<string> _final = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly Lock _gate = new();
-    private readonly List<string> _committedItems = [];
+    private readonly List<string> _itemOrder = [];
+    private readonly HashSet<string> _committedItems = [];
     private readonly Dictionary<string, string> _completedItems = [];
+    private readonly Dictionary<string, StringBuilder> _deltaText = [];
+    private long _audioBytesAppended;
     private bool _commitRequested;
     private bool _commitWasEmpty;
     private bool _audioAppended;
@@ -46,6 +52,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         if (!pcm.IsEmpty)
         {
             Volatile.Write(ref _audioAppended, true);
+            Interlocked.Add(ref _audioBytesAppended, pcm.Length);
             _outgoing.Writer.TryWrite(RealtimeProtocol.AppendAudio(pcm.Span));
         }
     }
@@ -65,6 +72,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
             _outgoing.Writer.TryWrite(RealtimeProtocol.AppendAudio(new byte[silenceBytes]));
         }
 
+        _log.Debug($"Committing {Interlocked.Read(ref _audioBytesAppended)} bytes of audio plus {_trailingSilence.TotalMilliseconds:F0} ms silence.");
         _outgoing.Writer.TryWrite(RealtimeProtocol.Commit());
         _outgoing.Writer.TryComplete();
         return await _final.Task.WaitAsync(cancellationToken);
@@ -143,10 +151,27 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         switch (serverEvent)
         {
             case ServerEvent.Committed committed:
+                _log.Debug($"Realtime event: committed item={committed.ItemId}.");
                 lock (_gate)
                 {
+                    Track(committed.ItemId);
                     _committedItems.Add(committed.ItemId);
                     TryFinish();
+                }
+
+                break;
+
+            case ServerEvent.TranscriptDelta delta:
+                lock (_gate)
+                {
+                    Track(delta.ItemId);
+                    if (!_deltaText.TryGetValue(delta.ItemId, out var text))
+                    {
+                        _deltaText[delta.ItemId] = text = new StringBuilder();
+                        _log.Debug($"Realtime event: first delta item={delta.ItemId}.");
+                    }
+
+                    text.Append(delta.Delta);
                 }
 
                 break;
@@ -154,13 +179,17 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
             case ServerEvent.TranscriptCompleted completed:
                 lock (_gate)
                 {
+                    Track(completed.ItemId);
                     _completedItems[completed.ItemId] = completed.Transcript;
+                    _log.Debug($"Realtime event: completed item={completed.ItemId} chars={completed.Transcript.Length} " +
+                               $"deltaChars={(_deltaText.TryGetValue(completed.ItemId, out var d) ? d.Length : 0)}.");
                     TryFinish();
                 }
 
                 break;
 
             case ServerEvent.Error { Code: RealtimeProtocol.CommitEmptyErrorCode }:
+                _log.Debug("Realtime event: commit was empty.");
                 lock (_gate)
                 {
                     _commitWasEmpty = true;
@@ -174,12 +203,17 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
                 Fail(new TranscriptionException($"OpenAI-Fehler: {error.Message} ({error.Code})"));
                 break;
 
-            case ServerEvent.TranscriptDelta:
-                break;
-
             case ServerEvent.Other other:
                 _log.Debug($"Realtime event: {other.Type}.");
                 break;
+        }
+    }
+
+    private void Track(string itemId)
+    {
+        if (!_itemOrder.Contains(itemId))
+        {
+            _itemOrder.Add(itemId);
         }
     }
 
@@ -197,11 +231,27 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
             return;
         }
 
-        var parts = _committedItems
-            .Where(_completedItems.ContainsKey)
-            .Select(id => _completedItems[id].Trim())
+        var parts = _itemOrder
+            .Select(TextOf)
             .Where(text => text.Length > 0);
-        _final.TrySetResult(string.Join(" ", parts));
+        var result = string.Join(" ", parts);
+        if (result.Length == 0)
+        {
+            _log.Warn($"Empty transcript: items={_itemOrder.Count}, committed={_committedItems.Count}, " +
+                      $"completed={_completedItems.Count}, audioBytes={Interlocked.Read(ref _audioBytesAppended)}.");
+        }
+
+        _final.TrySetResult(result);
+    }
+
+    private string TextOf(string itemId)
+    {
+        if (_completedItems.TryGetValue(itemId, out var completed) && completed.Trim().Length > 0)
+        {
+            return completed.Trim();
+        }
+
+        return _deltaText.TryGetValue(itemId, out var deltas) ? deltas.ToString().Trim() : string.Empty;
     }
 
     private void Fail(Exception exception) => _final.TrySetException(exception);
