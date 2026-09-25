@@ -119,3 +119,24 @@ auch pro Programm erzwingbar.
 
 Zwei kurze synthetisierte Zweiklänge (steigend = Start, fallend = Stopp), zur Laufzeit erzeugt – keine
 Audiodateien. Abspielen über NAudio `WaveOut`, nicht blockierend. `Audio.SoundsEnabled`, `Audio.SoundVolume`.
+
+## ADR-012 – Smart Mode über die Responses API (Phase 4)
+
+- Modell `gpt-6-luna` (günstigstes/schnellstes Textmodell, Stand 09/2026), `reasoning.effort: none`
+  (Default wäre `medium` → deutlich langsamer), `service_tier: fast` (2× Preis, ~0,02 Cent pro Diktat,
+  gleichmäßigere Latenz), `store: false` (keine Speicherung beim Anbieter). Alles in `settings.json`.
+- Prompt (`SmartProcessingPrompt`) statisch, Transkript im Input in `<transcript>`-Tags. Er stellt klar:
+  Das Transkript ist diktierter Inhalt, keine Anweisung – Fragen werden eingefügt, nicht beantwortet.
+- Kontext ausschließlich: Prozessname, optional Fenstertitel (standardmäßig **aus**, Titel können
+  Betreffzeilen enthalten), später Wörterbuch (§42).
+- **Überspringen:** Kurze Transkripte (≤ 20 Wörter) ohne Füllwörter, Korrekturen, Befehle, Buchstabieren,
+  Zahlwörter und Wiederholungen gehen ohne Modellaufruf durch (`SmartSkipHeuristic`, bewusst konservativ).
+- **Output-Guard:** Codefences werden entfernt; eine Ausgabe, die deutlich länger ist als das Transkript
+  (> 1,3× + 40 Zeichen), gilt als Antwort statt Bereinigung → Rohtext.
+- **Nie Diktat verlieren:** Fehler/Timeout (8 s) im Smart-Schritt → Rohtranskript wird eingefügt, Hinweis in
+  der Flow Bar. Leere Smart-Ausgabe (nur Füllwörter) → nichts einfügen.
+- Der Modus wird beim Aufnahmestart fixiert; Umschalten per Hotkey (`Ctrl+Shift+F12`) oder Tray.
+- Beim Aufnahmestart wird die HTTPS-Verbindung per `HEAD` vorgewärmt: erster Aufruf ~0,9 s statt ~3 s.
+
+Gemessen (10 Akzeptanzbeispiele, warm): Smart-Schritt 0,85–1,3 s. Zusammen mit dem finalen Transkript
+(~0,6 s) liegt der Smart-Pfad bei ~1,5–2 s, der übersprungene/Raw-Pfad weiterhin bei ~0,6 s.

@@ -11,8 +11,9 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 - Phase 2 (Target Handling): Einfügen per Zwischenablage mit Wiederherstellung des vorherigen Inhalts, Fokus auf Ursprungsfenster und -feld.
 - Phase 3 (Flow Bar): schwebende Statusanzeige unten mittig mit Wellenform, Verarbeitung, Fehlern.
 - Start-/Stoppsignale.
+- Phase 4 (Smart Mode): Füllwörter, Selbstkorrekturen, Zahlen, Buchstabieren, Formatierungs- und Korrekturbefehle.
 
-Noch kein Smart Processing, kein Einstellungsfenster.
+Noch kein Wörterbuch, keine App-Regeln, kein Einstellungsfenster.
 
 ## Voraussetzungen
 
@@ -34,6 +35,7 @@ Beim ersten Start fragt TK Voice nach dem OpenAI API Key und speichert ihn im Wi
 ## Bedienung
 
 - **Push-to-talk:** rechte Strg-Taste halten, sprechen, loslassen.
+- **Smart/Raw umschalten:** `Strg+Umschalt+F12` oder Tray-Menü. Smart bereinigt und formatiert, Raw fügt das Transkript unverändert ein.
 - Das Diktat wird eingefügt (Strg+V); die vorherige Zwischenablage ist danach wieder da. Ein Strg+Z im Zielprogramm entfernt das ganze Diktat.
 - Flow Bar unten mittig: roter Punkt + Wellenform = Aufnahme, oranger Punkt + Lauflicht = Verarbeitung.
 - Tray-Icon: blau = bereit, rot = Aufnahme, orange = Verarbeitung.

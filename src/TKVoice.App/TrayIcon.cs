@@ -5,6 +5,7 @@ using System.Drawing.Drawing2D;
 using System.Windows;
 using System.Windows.Forms;
 using TKVoice.Core.Abstractions;
+using TKVoice.Core.Processing;
 using TKVoice.Infrastructure;
 using Application = System.Windows.Application;
 
@@ -20,8 +21,9 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
     private readonly ILog _log;
     private readonly NotifyIcon _notifyIcon;
     private readonly Dictionary<DictationState, Icon> _icons;
+    private readonly ToolStripMenuItem _smartModeItem;
 
-    public TrayIcon(ICredentialService credentials, ILog log)
+    public TrayIcon(ICredentialService credentials, ProcessingModeState mode, Action toggleMode, ILog log)
     {
         _credentials = credentials;
         _log = log;
@@ -33,6 +35,13 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
         };
 
         var menu = new ContextMenuStrip();
+        _smartModeItem = new ToolStripMenuItem("Smart Mode (aus = Raw Mode)", null, (_, _) => toggleMode())
+        {
+            Checked = mode.Current == ProcessingMode.Smart,
+        };
+        mode.Changed += (_, current) => OnUiThread(() => _smartModeItem.Checked = current == ProcessingMode.Smart);
+        menu.Items.Add(_smartModeItem);
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("OpenAI API Key hinterlegen …", null, (_, _) => PromptForApiKey());
         menu.Items.Add("Logs öffnen", null, (_, _) => OpenLogs());
         menu.Items.Add(new ToolStripSeparator());

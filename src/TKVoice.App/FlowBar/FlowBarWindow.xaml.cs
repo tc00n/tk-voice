@@ -25,6 +25,7 @@ public partial class FlowBarWindow : Window
     private static readonly Brush RecordingBrush = Frozen(Color.FromRgb(0xFF, 0x45, 0x3A));
     private static readonly Brush ProcessingBrush = Frozen(Color.FromRgb(0xFF, 0x9F, 0x0A));
     private static readonly Brush BarBrush = Frozen(Color.FromArgb(0xE6, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush InfoBrush = Frozen(Color.FromRgb(0x0A, 0x84, 0xFF));
 
     private readonly Rectangle[] _bars = new Rectangle[BarCount];
     private readonly double[] _levels = new double[BarCount];
@@ -115,11 +116,20 @@ public partial class FlowBarWindow : Window
         RenderLevels();
     }
 
-    public void ShowError(string message)
+    public void ShowError(string message) => ShowMessage(message, isError: true);
+
+    /// <summary>Shows a short message for a few seconds, e.g. an error or a mode change.</summary>
+    public void ShowMessage(string message, bool isError)
     {
+        if (_state != DictationState.Idle && !isError)
+        {
+            // Never cover the recording/processing display with informational messages.
+            return;
+        }
+
         _processingAnimation.Stop();
         _slowProcessing.Stop();
-        Dot.Fill = RecordingBrush;
+        Dot.Fill = isError ? RecordingBrush : InfoBrush;
         Bars.Visibility = Visibility.Collapsed;
         SetStatus(message);
         if (!IsVisible)

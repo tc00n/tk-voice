@@ -7,6 +7,9 @@ namespace TKVoice.Core.Abstractions;
 /// <param name="FocusHandle">Focused child control, if the application exposes one as a native window; otherwise 0.</param>
 public sealed record DictationTarget(nint WindowHandle, int ProcessId, string ProcessName, nint FocusHandle = 0)
 {
+    /// <summary>Only captured when enabled in the settings. Never logged: titles can contain e-mail subjects etc.</summary>
+    public string? WindowTitle { get; init; }
+
     public override string ToString() => $"{ProcessName} (pid {ProcessId}, hwnd 0x{WindowHandle:X}, focus 0x{FocusHandle:X})";
 }
 

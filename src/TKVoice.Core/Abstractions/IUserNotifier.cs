@@ -1,3 +1,5 @@
+using TKVoice.Core.Processing;
+
 namespace TKVoice.Core.Abstractions;
 
 public enum DictationState
@@ -18,4 +20,8 @@ public interface IUserNotifier
     }
 
     void ShowError(string message);
+
+    void ShowModeChanged(ProcessingMode mode)
+    {
+    }
 }

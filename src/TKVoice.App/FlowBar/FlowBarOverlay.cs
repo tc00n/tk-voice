@@ -1,5 +1,6 @@
 using System.Windows.Threading;
 using TKVoice.Core.Abstractions;
+using TKVoice.Core.Processing;
 
 namespace TKVoice.App.FlowBar;
 
@@ -13,4 +14,8 @@ internal sealed class FlowBarOverlay(FlowBarWindow window) : IUserNotifier
     public void ReportAudioLevel(double level) => _dispatcher.BeginInvoke(DispatcherPriority.Render, () => window.ReportAudioLevel(level));
 
     public void ShowError(string message) => _dispatcher.BeginInvoke(() => window.ShowError(message));
+
+    public void ShowModeChanged(ProcessingMode mode) => _dispatcher.BeginInvoke(() => window.ShowMessage(
+        mode == ProcessingMode.Smart ? "Smart Mode" : "Raw Mode – ohne Nachbearbeitung",
+        isError: false));
 }

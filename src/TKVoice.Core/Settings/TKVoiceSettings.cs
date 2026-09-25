@@ -16,6 +16,9 @@ public sealed class TKVoiceSettings
 public sealed class HotkeySettings
 {
     public string PushToTalk { get; set; } = "RightCtrl";
+
+    /// <summary>Switches between Smart and Raw mode (FR-039). Empty disables the hotkey.</summary>
+    public string ToggleSmartRaw { get; set; } = "Ctrl+Shift+F12";
 }
 
 public sealed class AudioSettings
@@ -36,6 +39,18 @@ public sealed class ProcessingSettings
 {
     /// <summary>Maximum time from end of recording until the final transcript must be available.</summary>
     public int TimeoutSeconds { get; set; } = 20;
+
+    /// <summary>"Smart" or "Raw"; the mode TK Voice starts in.</summary>
+    public string DefaultMode { get; set; } = "Smart";
+
+    /// <summary>Maximum time for the smart processing request; on failure the raw transcript is inserted.</summary>
+    public int SmartTimeoutSeconds { get; set; } = 8;
+
+    /// <summary>Skip smart processing for short transcripts without fillers, corrections, commands or numbers.</summary>
+    public bool SkipSmartForSimpleText { get; set; } = true;
+
+    /// <summary>Also send the target window title as context. Off by default: titles can contain e-mail subjects etc.</summary>
+    public bool SendWindowTitle { get; set; }
 }
 
 public sealed class InsertionSettings
@@ -68,6 +83,15 @@ public sealed class OpenAISettings
 
     /// <summary>Silence appended before the final commit so the last spoken word is not cut off.</summary>
     public int TrailingSilenceMilliseconds { get; set; } = 300;
+
+    public string ResponsesUrl { get; set; } = "https://api.openai.com/v1/responses";
+    public string SmartProcessingModel { get; set; } = "gpt-6-luna";
+
+    /// <summary>Reasoning effort of the smart processing model; "none" keeps latency lowest.</summary>
+    public string SmartProcessingReasoningEffort { get; set; } = "none";
+
+    /// <summary>"fast" (OpenAI Fast mode: lower latency, 2× price) or "default"/empty for standard processing.</summary>
+    public string SmartProcessingServiceTier { get; set; } = "fast";
 }
 
 public sealed class DiagnosticsSettings

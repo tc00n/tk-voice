@@ -1,17 +1,21 @@
 using TKVoice.Core.Abstractions;
 using TKVoice.Core.Hotkeys;
+using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
 
 namespace TKVoice.Core.Dictation;
 
 /// <summary>
-/// Orchestrates one dictation at a time: capture target → record/stream → final transcript → insert.
+/// Orchestrates one dictation at a time: capture target → record/stream → final transcript →
+/// Smart or Raw processing → insert.
 /// Hotkey callbacks arrive sequentially; processing runs asynchronously so hotkeys stay responsive.
 /// </summary>
 public sealed class DictationController
 {
     private readonly IAudioCaptureService _audio;
     private readonly ITranscriptionService _transcription;
+    private readonly ISmartTextProcessor _smartProcessor;
+    private readonly ProcessingModeState _mode;
     private readonly ITargetCaptureService _targetCapture;
     private readonly ITextInsertionService _insertion;
     private readonly IUserNotifier _notifier;
@@ -26,6 +30,8 @@ public sealed class DictationController
     public DictationController(
         IAudioCaptureService audio,
         ITranscriptionService transcription,
+        ISmartTextProcessor smartProcessor,
+        ProcessingModeState mode,
         ITargetCaptureService targetCapture,
         ITextInsertionService insertion,
         IUserNotifier notifier,
@@ -35,6 +41,8 @@ public sealed class DictationController
     {
         _audio = audio;
         _transcription = transcription;
+        _smartProcessor = smartProcessor;
+        _mode = mode;
         _targetCapture = targetCapture;
         _insertion = insertion;
         _notifier = notifier;
@@ -59,9 +67,17 @@ public sealed class DictationController
 
     public void OnHotkeyPressed(HotkeyAction action)
     {
-        if (action == HotkeyAction.PushToTalk)
+        switch (action)
         {
-            StartRecording();
+            case HotkeyAction.PushToTalk:
+                StartRecording();
+                break;
+
+            case HotkeyAction.ToggleSmartRaw:
+                var mode = _mode.Toggle();
+                _log.Info($"Processing mode switched to {mode}.");
+                _notifier.ShowModeChanged(mode);
+                break;
         }
     }
 
@@ -102,7 +118,7 @@ public sealed class DictationController
                 return;
             }
 
-            var dictation = new ActiveDictation(target, session, _notifier);
+            var dictation = new ActiveDictation(target, session, _mode.Current, _notifier);
             try
             {
                 _audio.Start(dictation.OnAudio);
@@ -118,7 +134,11 @@ public sealed class DictationController
             _current = dictation;
             _state = DictationState.Recording;
             _sounds.PlayRecordingStarted();
-            _log.Info($"Recording started. Target: {target}.");
+            if (dictation.Mode == ProcessingMode.Smart)
+            {
+                _smartProcessor.Warmup();
+            }
+            _log.Info($"Recording started ({dictation.Mode}). Target: {target}.");
         }
 
         _notifier.SetState(DictationState.Recording);
@@ -158,9 +178,15 @@ public sealed class DictationController
             }
 
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.Processing.TimeoutSeconds));
-            var text = (await dictation.Session.CompleteAsync(timeout.Token)).Trim();
-            _log.Info($"Final transcript after {(DateTimeOffset.UtcNow - stopped).TotalMilliseconds:F0} ms ({text.Length} chars).");
+            var transcript = (await dictation.Session.CompleteAsync(timeout.Token)).Trim();
+            _log.Info($"Final transcript after {(DateTimeOffset.UtcNow - stopped).TotalMilliseconds:F0} ms ({transcript.Length} chars).");
 
+            if (transcript.Length == 0)
+            {
+                return;
+            }
+
+            var text = await ApplyModeAsync(dictation, transcript);
             if (text.Length == 0)
             {
                 return;
@@ -199,11 +225,63 @@ public sealed class DictationController
         }
     }
 
-    private sealed class ActiveDictation(DictationTarget target, ITranscriptionSession session, IUserNotifier notifier)
+    /// <summary>
+    /// Smart processing with graceful degradation: whatever goes wrong, the dictation is never lost;
+    /// the raw transcript is inserted instead and the user is told.
+    /// </summary>
+    private async Task<string> ApplyModeAsync(ActiveDictation dictation, string transcript)
+    {
+        if (dictation.Mode == ProcessingMode.Raw)
+        {
+            return transcript;
+        }
+
+        if (_settings.Processing.SkipSmartForSimpleText && SmartSkipHeuristic.CanSkip(transcript))
+        {
+            _log.Info("Smart processing skipped: simple text.");
+            return transcript;
+        }
+
+        var started = DateTimeOffset.UtcNow;
+        try
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.Processing.SmartTimeoutSeconds));
+            var request = new TextProcessingRequest(
+                transcript,
+                dictation.Target.ProcessName,
+                _settings.Processing.SendWindowTitle ? dictation.Target.WindowTitle : null);
+            var output = await _smartProcessor.ProcessAsync(request, timeout.Token);
+            _log.Info($"Smart processing took {(DateTimeOffset.UtcNow - started).TotalMilliseconds:F0} ms ({transcript.Length} → {output.Length} chars).");
+
+            if (output.Trim().Length == 0)
+            {
+                _log.Info("Smart processing found nothing to insert.");
+                return string.Empty;
+            }
+
+            if (SmartOutputGuard.TryAccept(transcript, output, out var accepted))
+            {
+                return accepted;
+            }
+
+            _log.Warn("Smart output rejected by guard; inserting raw transcript.");
+            _notifier.ShowError("Smart Mode lieferte eine unerwartete Antwort – Rohtext eingefügt.");
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"Smart processing failed after {(DateTimeOffset.UtcNow - started).TotalMilliseconds:F0} ms; inserting raw transcript.", ex);
+            _notifier.ShowError("Smart Mode nicht verfügbar – Rohtext eingefügt.");
+        }
+
+        return transcript;
+    }
+
+    private sealed class ActiveDictation(DictationTarget target, ITranscriptionSession session, ProcessingMode mode, IUserNotifier notifier)
     {
         private long _audioBytes;
 
         public DictationTarget Target { get; } = target;
+        public ProcessingMode Mode { get; } = mode;
         public ITranscriptionSession Session { get; } = session;
         public TimeSpan AudioDuration => AudioFormat.DurationOf(Interlocked.Read(ref _audioBytes));
 

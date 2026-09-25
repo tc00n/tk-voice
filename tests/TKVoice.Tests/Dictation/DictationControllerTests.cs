@@ -1,6 +1,7 @@
 using TKVoice.Core.Abstractions;
 using TKVoice.Core.Dictation;
 using TKVoice.Core.Hotkeys;
+using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
 
 namespace TKVoice.Tests.Dictation;
@@ -16,10 +17,125 @@ public class DictationControllerTests
     private readonly FakeInsertion _insertion = new();
     private readonly FakeNotifier _notifier = new();
     private readonly FakeSounds _sounds = new();
+    private readonly FakeSmartProcessor _smart = new();
+    private readonly ProcessingModeState _mode = new(ProcessingMode.Smart);
     private readonly TKVoiceSettings _settings = new();
 
     private DictationController CreateController() =>
-        new(_audio, _transcription, _targetCapture, _insertion, _notifier, _sounds, new NullLog(), _settings);
+        new(_audio, _transcription, _smart, _mode, _targetCapture, _insertion, _notifier, _sounds, new NullLog(), _settings);
+
+    private async Task DictateAsync(DictationController controller)
+    {
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
+        _audio.Emit(OneSecondOfAudio);
+        controller.OnHotkeyReleased(HotkeyAction.PushToTalk);
+        await controller.ProcessingCompletion;
+    }
+
+    [Fact]
+    public async Task Smart_mode_inserts_processed_text_with_app_context()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Ähm wir treffen uns Dienstag, nein Mittwoch.";
+        _smart.Output = "Wir treffen uns Mittwoch.";
+
+        await DictateAsync(controller);
+
+        Assert.Equal("Wir treffen uns Mittwoch.", _insertion.Inserted.Single().Text);
+        Assert.Equal("notepad", _smart.Requests.Single().ApplicationName);
+        Assert.Null(_smart.Requests.Single().WindowTitle);
+    }
+
+    [Fact]
+    public async Task Raw_mode_inserts_transcript_without_smart_processing()
+    {
+        var controller = CreateController();
+        _mode.Toggle();
+        _transcription.Result = "Ähm also wir müssen quasi morgen äh mit Peter sprechen.";
+
+        await DictateAsync(controller);
+
+        Assert.Equal(_transcription.Result, _insertion.Inserted.Single().Text);
+        Assert.Empty(_smart.Requests);
+    }
+
+    [Fact]
+    public async Task Mode_is_fixed_at_recording_start()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Ähm, Test.";
+        _smart.Output = "Test.";
+
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
+        controller.OnHotkeyPressed(HotkeyAction.ToggleSmartRaw);
+        _audio.Emit(OneSecondOfAudio);
+        controller.OnHotkeyReleased(HotkeyAction.PushToTalk);
+        await controller.ProcessingCompletion;
+
+        Assert.Equal("Test.", _insertion.Inserted.Single().Text);
+        Assert.Equal(ProcessingMode.Raw, _mode.Current);
+    }
+
+    [Fact]
+    public async Task Simple_text_skips_smart_processing()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Ich bin gleich da.";
+
+        await DictateAsync(controller);
+
+        Assert.Equal("Ich bin gleich da.", _insertion.Inserted.Single().Text);
+        Assert.Empty(_smart.Requests);
+    }
+
+    [Fact]
+    public async Task Smart_failure_falls_back_to_raw_transcript_and_informs_user()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Ähm, das ist ein Test.";
+        _smart.Error = new SmartProcessingException("offline");
+
+        await DictateAsync(controller);
+
+        Assert.Equal("Ähm, das ist ein Test.", _insertion.Inserted.Single().Text);
+        Assert.Single(_notifier.Errors);
+    }
+
+    [Fact]
+    public async Task Smart_output_that_answers_instead_of_cleaning_is_rejected()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Äh, wie spät ist es?";
+        _smart.Output = "Es ist aktuell 14:32 Uhr. Wenn du möchtest, kann ich dir auch die Zeit in anderen Zeitzonen nennen oder einen Wecker stellen.";
+
+        await DictateAsync(controller);
+
+        Assert.Equal("Äh, wie spät ist es?", _insertion.Inserted.Single().Text);
+    }
+
+    [Fact]
+    public async Task Empty_smart_output_inserts_nothing()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Ähm, äh.";
+        _smart.Output = "";
+
+        await DictateAsync(controller);
+
+        Assert.Empty(_insertion.Inserted);
+        Assert.Empty(_notifier.Errors);
+    }
+
+    [Fact]
+    public void Toggle_hotkey_switches_mode_and_informs_user()
+    {
+        var controller = CreateController();
+
+        controller.OnHotkeyPressed(HotkeyAction.ToggleSmartRaw);
+
+        Assert.Equal(ProcessingMode.Raw, _mode.Current);
+        Assert.Equal([ProcessingMode.Raw], _notifier.Modes);
+    }
 
     [Fact]
     public async Task Push_to_talk_records_transcribes_and_inserts_into_captured_target()
@@ -204,6 +320,19 @@ public class DictationControllerTests
         }
     }
 
+    private sealed class FakeSmartProcessor : ISmartTextProcessor
+    {
+        public string Output { get; set; } = string.Empty;
+        public Exception? Error { get; set; }
+        public List<TextProcessingRequest> Requests { get; } = [];
+
+        public Task<string> ProcessAsync(TextProcessingRequest request, CancellationToken cancellationToken)
+        {
+            Requests.Add(request);
+            return Error is null ? Task.FromResult(Output) : Task.FromException<string>(Error);
+        }
+    }
+
     private sealed class FakeSounds : ISoundService
     {
         public List<string> Played { get; } = [];
@@ -226,6 +355,10 @@ public class DictationControllerTests
             }
         }
 
+        public List<ProcessingMode> Modes { get; } = [];
+
         public void ShowError(string message) => Errors.Add(message);
+
+        public void ShowModeChanged(ProcessingMode mode) => Modes.Add(mode);
     }
 }

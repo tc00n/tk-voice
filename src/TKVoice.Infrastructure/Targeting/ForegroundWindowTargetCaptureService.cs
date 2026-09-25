@@ -5,7 +5,7 @@ using TKVoice.Infrastructure.Native;
 namespace TKVoice.Infrastructure.Targeting;
 
 /// <summary>Captures the foreground window as insertion target. Reads no window content (FR-023).</summary>
-public sealed class ForegroundWindowTargetCaptureService(ILog log) : ITargetCaptureService
+public sealed class ForegroundWindowTargetCaptureService(bool captureWindowTitle, ILog log) : ITargetCaptureService
 {
     public DictationTarget? CaptureCurrentTarget()
     {
@@ -22,7 +22,18 @@ public sealed class ForegroundWindowTargetCaptureService(ILog log) : ITargetCapt
             return null;
         }
 
-        return new DictationTarget(hwnd, (int)processId, GetProcessName((int)processId), GetFocusedControl(threadId));
+        return new DictationTarget(hwnd, (int)processId, GetProcessName((int)processId), GetFocusedControl(threadId))
+        {
+            WindowTitle = captureWindowTitle ? GetWindowTitle(hwnd) : null,
+        };
+    }
+
+    private static unsafe string GetWindowTitle(nint hwnd)
+    {
+        const int capacity = 512;
+        var buffer = stackalloc char[capacity];
+        var length = NativeMethods.GetWindowTextW(hwnd, buffer, capacity);
+        return new string(buffer, 0, Math.Max(length, 0));
     }
 
     /// <summary>

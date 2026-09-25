@@ -212,6 +212,9 @@ internal static partial class NativeMethods
     public static partial nint SetFocus(nint hWnd);
 
     [LibraryImport("user32.dll")]
+    public static unsafe partial int GetWindowTextW(nint hWnd, char* lpString, int nMaxCount);
+
+    [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool IsChild(nint hWndParent, nint hWnd);
 
