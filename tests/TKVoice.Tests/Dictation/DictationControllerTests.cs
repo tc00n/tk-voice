@@ -15,10 +15,11 @@ public class DictationControllerTests
     private readonly FakeTargetCapture _targetCapture = new() { Target = Notepad };
     private readonly FakeInsertion _insertion = new();
     private readonly FakeNotifier _notifier = new();
+    private readonly FakeSounds _sounds = new();
     private readonly TKVoiceSettings _settings = new();
 
     private DictationController CreateController() =>
-        new(_audio, _transcription, _targetCapture, _insertion, _notifier, new NullLog(), _settings);
+        new(_audio, _transcription, _targetCapture, _insertion, _notifier, _sounds, new NullLog(), _settings);
 
     [Fact]
     public async Task Push_to_talk_records_transcribes_and_inserts_into_captured_target()
@@ -40,6 +41,7 @@ public class DictationControllerTests
         Assert.Equal(OneSecondOfAudio.Length, _transcription.Session!.AppendedBytes);
         Assert.True(_transcription.Session.Disposed);
         Assert.Equal([DictationState.Recording, DictationState.Processing, DictationState.Idle], _notifier.States);
+        Assert.Equal(["started", "stopped"], _sounds.Played);
         Assert.Equal(DictationState.Idle, controller.State);
     }
 
@@ -127,6 +129,7 @@ public class DictationControllerTests
 
         Assert.False(_audio.IsRunning);
         Assert.Single(_notifier.Errors);
+        Assert.Empty(_sounds.Played);
         Assert.Equal(DictationState.Idle, controller.State);
     }
 
@@ -199,6 +202,15 @@ public class DictationControllerTests
 
             return Task.FromResult(Result);
         }
+    }
+
+    private sealed class FakeSounds : ISoundService
+    {
+        public List<string> Played { get; } = [];
+
+        public void PlayRecordingStarted() => Played.Add("started");
+
+        public void PlayRecordingStopped() => Played.Add("stopped");
     }
 
     private sealed class FakeNotifier : IUserNotifier

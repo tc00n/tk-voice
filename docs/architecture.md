@@ -46,7 +46,7 @@ Die Solution liegt im neuen Format `TKVoice.slnx`.
 - Offen für Phase 7: lange Hands-free-Diktate brauchen Segmentierung mit Commit bei Sprechpausen;
   eine etwaige maximale Session-Dauer ist zu prüfen und ggf. per Session-Wechsel zu umgehen.
 
-## ADR-004 – Texteingabe per `SendInput` Unicode (Phase 1)
+## ADR-004 – Texteingabe per `SendInput` Unicode (Phase 1, abgelöst durch ADR-009)
 
 Unicode-Tastenanschläge (`KEYEVENTF_UNICODE`) funktionieren in praktisch allen Textfeldern und lassen die
 Zwischenablage unberührt. Zeilenumbrüche werden als Enter gesendet. Vor dem Tippen wird gewartet, bis
@@ -83,3 +83,39 @@ Windows 11 meist im Überlauf). Deshalb wurde Phase 3 vor Phase 2 umgesetzt.
 Die Aufnahme endet beim Loslassen sofort (FR-002). Vor dem Commit werden 300 ms Stille angehängt
 (`OpenAI.TrailingSilenceMilliseconds`), damit das Modell ein beim Loslassen noch gesprochenes Wort
 abschließen kann. Kostet keine spürbare Latenz.
+
+## ADR-009 – Einfügen per Zwischenablage mit Delayed Rendering (Phase 2)
+
+Standard ist jetzt **Paste** (Zwischenablage + Strg+V) statt Tippen:
+- ein einziger Undo-Schritt im Zielprogramm (Strg+Z entfernt das ganze Diktat),
+- Zeilenumbrüche lösen in Chat-Apps (Teams, Slack) kein vorzeitiges Senden aus,
+- keine Autovervollständigung/Auto-Klammern durch einzelne Tastenanschläge.
+
+Clipboard Preservation (FR-029): Vor dem Einfügen werden alle speicherbasierten Formate kopiert
+(`CF_BITMAP`/Metafiles werden über ihre `CF_DIB`-Varianten mit abgedeckt). Der Diktattext wird per
+**Delayed Rendering** angeboten: Windows fordert ihn bei TK Voice an, sobald das Zielprogramm ihn liest
+(`WM_RENDERFORMAT`). Erst danach (plus 150 ms Karenz) wird der alte Inhalt zurückgeschrieben. Ein fester
+Timer würde bei langsamen Programmen riskieren, dass der *alte* Clipboard-Inhalt eingefügt wird.
+Hat inzwischen jemand anderes die Zwischenablage belegt, wird nicht zurückgeschrieben.
+
+Der Diktattext wird mit `ExcludeClipboardContentFromMonitorProcessing`, `CanIncludeInClipboardHistory=0`
+und `CanUploadToCloudClipboard=0` markiert und landet so nicht im Windows-Clipboard-Verlauf (NFR-003).
+
+Alle Clipboard-Aufrufe laufen auf dem UI-Thread mit eigenem Message-only-Fenster, da der Clipboard-Owner
+Render-Anfragen sofort beantworten muss.
+
+Fallback auf Tippen, wenn die Zwischenablage blockiert ist; per `Insertion.TypeInsteadOfPasteProcesses`
+auch pro Programm erzwingbar.
+
+## ADR-010 – Zielwiederherstellung
+
+- Beim Start wird zusätzlich das fokussierte native Steuerelement erfasst (`GetGUIThreadInfo`).
+  Chromium/Electron/UWP-Apps haben nur ein natives Fenster und merken sich den internen Fokus selbst.
+- Fokus zurückholen: `SetForegroundWindow`; falls Windows das verweigert, zuerst eine nicht belegte
+  virtuelle Taste injizieren (macht TK Voice zur „letzten Eingabequelle“), dann `AttachThreadInput`.
+- Gelingt es nicht innerhalb von 500 ms, wird nicht eingefügt (FR-027).
+
+## ADR-011 – Start-/Stoppsignale (FR-034)
+
+Zwei kurze synthetisierte Zweiklänge (steigend = Start, fallend = Stopp), zur Laufzeit erzeugt – keine
+Audiodateien. Abspielen über NAudio `WaveOut`, nicht blockierend. `Audio.SoundsEnabled`, `Audio.SoundVolume`.

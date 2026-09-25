@@ -6,6 +6,7 @@ using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Settings;
 using TKVoice.Infrastructure;
 using TKVoice.Infrastructure.Audio;
+using TKVoice.Infrastructure.Clipboard;
 using TKVoice.Infrastructure.Hotkeys;
 using TKVoice.Infrastructure.Logging;
 using TKVoice.Infrastructure.Security;
@@ -24,6 +25,7 @@ public partial class App : Application
     private FileLog? _log;
     private TrayIcon? _tray;
     private IHotkeyService? _hotkeys;
+    private Win32ClipboardService? _clipboard;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -50,12 +52,15 @@ public partial class App : Application
         _tray = new TrayIcon(credentials, _log);
         var notifier = new CompositeNotifier(_tray, new FlowBarOverlay(new FlowBarWindow()));
 
+        _clipboard = new Win32ClipboardService(SynchronizationContext.Current!, _log);
+
         var controller = new DictationController(
             new WaveInAudioCaptureService(settings.Audio.InputDeviceNumber, _log),
             new RealtimeTranscriptionService(settings.OpenAI, credentials, _log),
             new ForegroundWindowTargetCaptureService(_log),
-            new SendInputTextInsertionService(_log),
+            new WindowsTextInsertionService(_clipboard, settings.Insertion, _log),
             notifier,
+            new ToneSoundService(settings.Audio.SoundsEnabled, settings.Audio.SoundVolume, _log),
             _log,
             settings);
 
@@ -86,6 +91,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _hotkeys?.Dispose();
+        _clipboard?.Dispose();
         _tray?.Dispose();
         _log?.Info("TK Voice stopped.");
         _singleInstance?.Dispose();

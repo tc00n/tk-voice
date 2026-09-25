@@ -15,6 +15,7 @@ public sealed class DictationController
     private readonly ITargetCaptureService _targetCapture;
     private readonly ITextInsertionService _insertion;
     private readonly IUserNotifier _notifier;
+    private readonly ISoundService _sounds;
     private readonly ILog _log;
     private readonly TKVoiceSettings _settings;
     private readonly Lock _gate = new();
@@ -28,6 +29,7 @@ public sealed class DictationController
         ITargetCaptureService targetCapture,
         ITextInsertionService insertion,
         IUserNotifier notifier,
+        ISoundService sounds,
         ILog log,
         TKVoiceSettings settings)
     {
@@ -36,6 +38,7 @@ public sealed class DictationController
         _targetCapture = targetCapture;
         _insertion = insertion;
         _notifier = notifier;
+        _sounds = sounds;
         _log = log;
         _settings = settings;
     }
@@ -114,6 +117,7 @@ public sealed class DictationController
 
             _current = dictation;
             _state = DictationState.Recording;
+            _sounds.PlayRecordingStarted();
             _log.Info($"Recording started. Target: {target}.");
         }
 
@@ -131,6 +135,7 @@ public sealed class DictationController
             }
 
             _audio.Stop();
+            _sounds.PlayRecordingStopped();
             dictation = _current;
             _current = null;
             _state = DictationState.Processing;

@@ -19,6 +19,11 @@ internal static partial class NativeMethods
     public const ushort VK_RETURN = 0x0D;
     public const ushort VK_TAB = 0x09;
     public const ushort VK_MENU = 0x12;
+    public const ushort VK_CONTROL = 0x11;
+    public const ushort VK_V = 0x56;
+
+    /// <summary>Unassigned virtual key; injecting it grants foreground rights without side effects in the target.</summary>
+    public const ushort VK_UNASSIGNED = 0xE8;
 
     public delegate nint LowLevelKeyboardProc(int nCode, nint wParam, nint lParam);
 
@@ -173,4 +178,98 @@ internal static partial class NativeMethods
     public static extern void CredFree(nint buffer);
 
     public static bool IsKeyPhysicallyDown(int virtualKey) => (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+
+    // Focus
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct GUITHREADINFO
+    {
+        public int cbSize;
+        public uint flags;
+        public nint hwndActive;
+        public nint hwndFocus;
+        public nint hwndCapture;
+        public nint hwndMenuOwner;
+        public nint hwndMoveSize;
+        public nint hwndCaret;
+        public RECT rcCaret;
+    }
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO pgui);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint SetFocus(nint hWnd);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsChild(nint hWndParent, nint hWnd);
+
+    // Clipboard
+
+    public const uint CF_UNICODETEXT = 13;
+    public const uint GMEM_MOVEABLE = 0x0002;
+    public static readonly nint HWND_MESSAGE = -3;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool OpenClipboard(nint hWndNewOwner);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool CloseClipboard();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool EmptyClipboard();
+
+    [LibraryImport("user32.dll")]
+    public static partial uint EnumClipboardFormats(uint format);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint GetClipboardData(uint uFormat);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint SetClipboardData(uint uFormat, nint hMem);
+
+    [LibraryImport("user32.dll")]
+    public static partial nint GetClipboardOwner();
+
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial uint RegisterClipboardFormatW(string lpszFormat);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GlobalAlloc(uint uFlags, nuint dwBytes);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GlobalLock(nint hMem);
+
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GlobalUnlock(nint hMem);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nuint GlobalSize(nint hMem);
+
+    [LibraryImport("kernel32.dll")]
+    public static partial nint GlobalFree(nint hMem);
+
+    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
+    public static partial nint CreateWindowExW(
+        uint dwExStyle, string lpClassName, string? lpWindowName, uint dwStyle,
+        int x, int y, int nWidth, int nHeight, nint hWndParent, nint hMenu, nint hInstance, nint lpParam);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DestroyWindow(nint hWnd);
 }

@@ -8,6 +8,7 @@ public sealed class TKVoiceSettings
     public HotkeySettings Hotkeys { get; set; } = new();
     public AudioSettings Audio { get; set; } = new();
     public ProcessingSettings Processing { get; set; } = new();
+    public InsertionSettings Insertion { get; set; } = new();
     public OpenAISettings OpenAI { get; set; } = new();
     public DiagnosticsSettings Diagnostics { get; set; } = new();
 }
@@ -24,12 +25,32 @@ public sealed class AudioSettings
 
     /// <summary>Recordings shorter than this are treated as accidental taps and discarded.</summary>
     public int MinimumRecordingMilliseconds { get; set; } = 300;
+
+    public bool SoundsEnabled { get; set; } = true;
+
+    /// <summary>Volume of the start/stop sounds, 0.0 to 1.0.</summary>
+    public double SoundVolume { get; set; } = 0.4;
 }
 
 public sealed class ProcessingSettings
 {
     /// <summary>Maximum time from end of recording until the final transcript must be available.</summary>
     public int TimeoutSeconds { get; set; } = 20;
+}
+
+public sealed class InsertionSettings
+{
+    /// <summary>"Paste" (clipboard + Ctrl+V, clipboard restored afterwards) or "Type" (Unicode keystrokes).</summary>
+    public string Method { get; set; } = "Paste";
+
+    /// <summary>Process names (without .exe) that should always receive typed keystrokes instead of a paste.</summary>
+    public List<string> TypeInsteadOfPasteProcesses { get; set; } = [];
+
+    /// <summary>
+    /// Grace period after the target application has read the pasted text before the previous
+    /// clipboard content is restored.
+    /// </summary>
+    public int ClipboardRestoreDelayMilliseconds { get; set; } = 150;
 }
 
 public sealed class OpenAISettings

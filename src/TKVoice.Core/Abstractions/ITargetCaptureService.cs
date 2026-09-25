@@ -3,9 +3,11 @@ namespace TKVoice.Core.Abstractions;
 /// <summary>
 /// The insertion target captured when a dictation starts (FR-025). Holds no content from the target.
 /// </summary>
-public sealed record DictationTarget(nint WindowHandle, int ProcessId, string ProcessName)
+/// <param name="WindowHandle">Top-level foreground window.</param>
+/// <param name="FocusHandle">Focused child control, if the application exposes one as a native window; otherwise 0.</param>
+public sealed record DictationTarget(nint WindowHandle, int ProcessId, string ProcessName, nint FocusHandle = 0)
 {
-    public override string ToString() => $"{ProcessName} (pid {ProcessId}, hwnd 0x{WindowHandle:X})";
+    public override string ToString() => $"{ProcessName} (pid {ProcessId}, hwnd 0x{WindowHandle:X}, focus 0x{FocusHandle:X})";
 }
 
 public interface ITargetCaptureService
