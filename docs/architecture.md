@@ -256,3 +256,24 @@ erreichbarer Server → 3 Versuche mit Replay, klare Fehlermeldung nach 2,6 s.
   Host-Fenster sorgt dafür, dass es sich bei Klick daneben schließt.
 - Von `TextBox` abgeleitete Controls übernehmen den Fluent-Style nicht automatisch
   (`SetResourceReference(StyleProperty, typeof(TextBox))`).
+
+## ADR-019 – Sicherheit & Diagnose (Phase 10)
+
+- **Passwortfelder (FR-038):** UI Automation liefert für das fokussierte Element `IsPassword` (Win32
+  Password-Edits, WPF/WinUI-PasswordBox, `<input type="password">` im Browser). Geprüft wird beim
+  Aufnahmestart (dann öffnet sich das Mikrofon gar nicht) und nochmals direkt vor dem Einfügen nach der
+  Fokus-Wiederherstellung. Nur dieses eine Flag wird gelesen, nie Inhalte. Zeitlimit 250 ms (gemessen: 4 ms);
+  antwortet eine Anwendung nicht, gilt das Feld als normales Feld. UIA wird beim Start vorgewärmt.
+  Dafür nutzt `TKVoice.Infrastructure` `UseWPF` (UIAutomationClient).
+- **Usage Tracking (FR-040):** `UsageTracker` in `%APPDATA%\TK Voice\usage.json`, je Monat: Diktate,
+  Audiosekunden, Smart-Anfragen, Tokens, geschätzte Kosten, bereits gemeldete Schwellen – keine Inhalte.
+  Transkription wird nach Audiodauer berechnet (auch bei Fehlschlag, da gestreamtes Audio abgerechnet wird),
+  Smart Processing nach den Tokens aus der API-Antwort, Fast mode mit Faktor.
+- **Preise (Kostenkonfiguration)** in `settings.json` (`Costs`): 0,017 $/min Transkription, 0,10/0,50 $
+  pro Mio. Tokens, Fast mode ×2 – als Schätzung gekennzeichnet.
+- **Budget (FR-041):** Monatslimit in USD (0 = aus), Warnschwellen (Standard 50/80 %) je einmal pro Monat
+  als Hinweis; bei 100 % blockiert der Controller neue Diktate bis Monatsende oder bis das Limit erhöht wird.
+- **Debug-Modus (NFR-007):** standardmäßig aus; wenn an, schreibt `FileDictationDebugLog` Programm, Modus,
+  Transkript und eingefügten Text in `%LOCALAPPDATA%\TK Voice\debug\` (getrennt vom technischen Log).
+  Sichtbar: „DEBUG“-Badge in der Flow Bar, Tray-Tooltip und Hinweis beim Einschalten. „Debug-Daten löschen“
+  entfernt den Ordner.

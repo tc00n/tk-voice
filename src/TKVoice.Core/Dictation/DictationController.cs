@@ -3,6 +3,7 @@ using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
+using TKVoice.Core.Usage;
 
 namespace TKVoice.Core.Dictation;
 
@@ -24,6 +25,9 @@ public sealed class DictationController
     private readonly ISoundService _sounds;
     private readonly ILog _log;
     private readonly TKVoiceSettings _settings;
+    private readonly UsageTracker? _usage;
+    private readonly IPasswordFieldDetector _passwordFields;
+    private readonly IDictationDebugLog _debugLog;
     private readonly Lock _gate = new();
 
     private DictationState _state = DictationState.Idle;
@@ -40,8 +44,14 @@ public sealed class DictationController
         IUserNotifier notifier,
         ISoundService sounds,
         ILog log,
-        TKVoiceSettings settings)
+        TKVoiceSettings settings,
+        UsageTracker? usage = null,
+        IPasswordFieldDetector? passwordFields = null,
+        IDictationDebugLog? debugLog = null)
     {
+        _usage = usage;
+        _passwordFields = passwordFields ?? new NoPasswordFieldDetector();
+        _debugLog = debugLog ?? new NoDictationDebugLog();
         _audio = audio;
         _audio.Failed += OnMicrophoneFailed;
         _transcription = transcription;
@@ -168,6 +178,20 @@ public sealed class DictationController
                 return;
             }
 
+            if (_usage?.IsBudgetExhausted == true)
+            {
+                _log.Warn("Monthly budget exhausted; dictation blocked.");
+                _notifier.ShowError("Monatsbudget erreicht – Diktieren ist gesperrt. Limit in den Einstellungen unter „Kosten“ anpassbar.");
+                return;
+            }
+
+            if (_passwordFields.IsFocusInPasswordField())
+            {
+                _log.Info("Focus is in a password field; dictation blocked.");
+                _notifier.ShowError("Passwortfeld erkannt – hier ist Diktieren deaktiviert.");
+                return;
+            }
+
             ITranscriptionSession session;
             try
             {
@@ -285,6 +309,9 @@ public sealed class DictationController
                 return;
             }
 
+            // Streamed audio is billed whether or not transcription succeeds.
+            _usage?.RecordTranscription(dictation.AudioDuration);
+
             using var timeout = new CancellationTokenSource(OverallTimeout(_settings.Processing.TimeoutSeconds));
             var transcript = (await dictation.Session.CompleteAsync(timeout.Token)).Trim();
             _log.Info($"Final transcript after {(DateTimeOffset.UtcNow - stopped).TotalMilliseconds:F0} ms ({transcript.Length} chars).");
@@ -308,8 +335,16 @@ public sealed class DictationController
                 return;
             }
 
+            if (result == InsertionResult.PasswordField)
+            {
+                _log.Info("Insertion blocked: password field.");
+                _notifier.ShowError("Passwortfeld erkannt – der Text wurde nicht eingefügt.");
+                return;
+            }
+
             _log.Info($"Text inserted. Stop-to-insert latency: {(DateTimeOffset.UtcNow - stopped).TotalMilliseconds:F0} ms.");
             LearnSpelledTerms(transcript, text);
+            _debugLog.Record(dictation.Target.DisplayName, dictation.Mode, transcript, text);
         }
         catch (OperationCanceledException)
         {

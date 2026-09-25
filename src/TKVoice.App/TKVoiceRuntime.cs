@@ -4,9 +4,13 @@ using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
+using TKVoice.Core.Usage;
+using TKVoice.Infrastructure;
 using TKVoice.Infrastructure.Audio;
 using TKVoice.Infrastructure.Clipboard;
 using TKVoice.Infrastructure.Hotkeys;
+using TKVoice.Infrastructure.Logging;
+using TKVoice.Infrastructure.Security;
 using TKVoice.Infrastructure.Targeting;
 using TKVoice.Infrastructure.TextInsertion;
 using TKVoice.OpenAI;
@@ -22,6 +26,8 @@ internal sealed record SharedServices(
     ProcessingModeState Mode,
     Win32ClipboardService Clipboard,
     IUserNotifier Notifier,
+    UsageTracker Usage,
+    UiaPasswordFieldDetector PasswordFields,
     Func<bool> IsActive);
 
 /// <summary>
@@ -36,7 +42,8 @@ internal sealed class TKVoiceRuntime : IDisposable
     public TKVoiceRuntime(TKVoiceSettings settings, SharedServices shared)
     {
         var log = shared.Log;
-        _smartProcessor = new OpenAISmartTextProcessor(settings.OpenAI, settings.Processing, shared.Credentials, () => shared.Dictionary.Terms, log);
+        _smartProcessor = new OpenAISmartTextProcessor(
+            settings.OpenAI, settings.Processing, shared.Credentials, () => shared.Dictionary.Terms, log, usage: shared.Usage);
         var addToDictionary = new AddToDictionaryCommand(new ClipboardSelectionReader(shared.Clipboard, log), shared.Dictionary, shared.Notifier, log);
 
         Controller = new DictationController(
@@ -51,11 +58,14 @@ internal sealed class TKVoiceRuntime : IDisposable
             shared.Mode,
             shared.Dictionary,
             new ForegroundWindowTargetCaptureService(settings.Processing.SendWindowTitle, log),
-            new WindowsTextInsertionService(shared.Clipboard, settings.Insertion, log),
+            new WindowsTextInsertionService(shared.Clipboard, settings.Insertion, shared.PasswordFields, log),
             shared.Notifier,
             new ToneSoundService(settings.Audio.SoundsEnabled, settings.Audio.SoundVolume, log),
             log,
-            settings);
+            settings,
+            shared.Usage,
+            shared.PasswordFields,
+            settings.Diagnostics.DebugMode ? new FileDictationDebugLog(AppPaths.DebugDirectory) : new NoDictationDebugLog());
 
         Hotkeys = new LowLevelHotkeyService(log);
         Hotkeys.Pressed += (_, action) =>

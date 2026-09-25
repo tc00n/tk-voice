@@ -11,6 +11,7 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 - Phase 2 (Target Handling): Einfügen per Zwischenablage mit Wiederherstellung des vorherigen Inhalts, Fokus auf Ursprungsfenster und -feld.
 - Phase 3 (Flow Bar): schwebende Statusanzeige unten mittig mit Wellenform, Verarbeitung, Fehlern.
 - Start-/Stoppsignale.
+- Phase 10 (Sicherheit & Diagnose): Passwortfeld-Sperre, Kostenübersicht mit Monatsbudget, Debug-Modus.
 - Phase 9 (Einstellungen & Tray): Einstellungsfenster, Pausieren, Autostart, Hotkeys per Tastendruck.
 - Phase 8 (Zuverlässigkeit): automatische Wiederholung bei Netzwerk-/Serverfehlern ohne Diktatverlust, klare Fehlermeldungen, Mikrofonausfall.
 - Phase 7 (Hands-free): freihändige Aufnahme ohne Längenbegrenzung, optionales Stille-Ende.
@@ -18,7 +19,7 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 - Phase 5 (Wörterbuch): Begriffe verbessern Erkennung und Schreibweise; lernen per Markieren + Hotkey oder Buchstabieren.
 - Phase 4 (Smart Mode): Füllwörter, Selbstkorrekturen, Zahlen, Buchstabieren, Formatierungs- und Korrekturbefehle.
 
-Offen: Kostenübersicht/Budget, Debug-Modus, Passwortfeld-Erkennung (Phase 10), Installer (Phase 11).
+Offen: Installer (Phase 11).
 
 ## Voraussetzungen
 
@@ -54,6 +55,8 @@ Credential Manager (`TKVoice/OpenAI`) gespeichert. Alle Einstellungen: Tray-Icon
 |---|---|
 | Einstellungen | `%APPDATA%\TK Voice\settings.json` |
 | Wörterbuch | `%APPDATA%\TK Voice\dictionary.json` |
+| Nutzung/Kosten (ohne Inhalte) | `%APPDATA%\TK Voice\usage.json` |
+| Debug-Daten (nur im Debug-Modus) | `%LOCALAPPDATA%\TK Voice\debug\` |
 | Technische Logs (ohne Inhalte) | `%LOCALAPPDATA%\TK Voice\logs\` |
 | API Key | Windows Credential Manager, `TKVoice/OpenAI` |
 

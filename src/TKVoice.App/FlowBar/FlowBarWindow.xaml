@@ -23,6 +23,10 @@
             <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.35" />
         </Border.Effect>
         <StackPanel Orientation="Horizontal">
+            <Border x:Name="DebugBadge" Background="#FF9F0A" CornerRadius="3" Padding="4,0" Margin="0,0,8,0"
+                    VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock Text="DEBUG" FontSize="9" FontWeight="Bold" Foreground="#1C1C1E" />
+            </Border>
             <Ellipse x:Name="Dot" Width="8" Height="8" VerticalAlignment="Center" Margin="0,0,10,0" />
             <StackPanel x:Name="Bars" Orientation="Horizontal" Height="24" VerticalAlignment="Center" />
             <TextBlock x:Name="StatusText"

@@ -4,6 +4,7 @@ using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
+using TKVoice.Core.Usage;
 
 namespace TKVoice.Tests.Dictation;
 
@@ -22,6 +23,11 @@ public class DictationControllerTests : IDisposable
     private readonly ProcessingModeState _mode = new(ProcessingMode.Smart);
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "tkvoice-tests-" + Guid.NewGuid().ToString("N"));
     private PersonalDictionary? _dictionary;
+    private readonly FakePasswordFields _passwordFields = new();
+    private readonly FakeDebugLog _debugLog = new();
+    private UsageTracker? _usage;
+
+    private UsageTracker Usage => _usage ??= new UsageTracker(Path.Combine(_directory, "usage.json"), () => _settings.Costs);
 
     private PersonalDictionary Dictionary => _dictionary ??= new PersonalDictionary(Path.Combine(_directory, "dictionary.json"));
 
@@ -35,7 +41,7 @@ public class DictationControllerTests : IDisposable
     private readonly TKVoiceSettings _settings = new();
 
     private DictationController CreateController() =>
-        new(_audio, _transcription, _smart, _mode, Dictionary, _targetCapture, _insertion, _notifier, _sounds, new NullLog(), _settings);
+        new(_audio, _transcription, _smart, _mode, Dictionary, _targetCapture, _insertion, _notifier, _sounds, new NullLog(), _settings, Usage, _passwordFields, _debugLog);
 
     private async Task DictateAsync(DictationController controller)
     {
@@ -315,6 +321,68 @@ public class DictationControllerTests : IDisposable
     }
 
     [Fact]
+    public void Password_field_blocks_dictation_before_the_microphone_opens()
+    {
+        _passwordFields.IsPassword = true;
+        var controller = CreateController();
+
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
+
+        Assert.False(_audio.IsRunning);
+        Assert.Equal(DictationState.Idle, controller.State);
+        Assert.Contains("Passwortfeld", _notifier.Errors.Single());
+    }
+
+    [Fact]
+    public async Task Password_field_at_insertion_time_is_reported()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Geheim.";
+        _insertion.Result = InsertionResult.PasswordField;
+
+        await DictateAsync(controller);
+
+        Assert.Contains("Passwortfeld", _notifier.Errors.Single());
+    }
+
+    [Fact]
+    public void Exhausted_budget_blocks_dictation()
+    {
+        _settings.Costs.MonthlyLimitUsd = 0.01;
+        Usage.RecordTranscription(TimeSpan.FromMinutes(10));
+        var controller = CreateController();
+
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
+
+        Assert.False(_audio.IsRunning);
+        Assert.Contains(_notifier.Errors, e => e.Contains("Monatsbudget"));
+    }
+
+    [Fact]
+    public async Task Transcribed_audio_is_recorded_as_usage()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Text.";
+
+        await DictateAsync(controller);
+
+        Assert.Equal(1, Usage.CurrentMonth.TranscriptionRequests);
+        Assert.Equal(1.0, Usage.CurrentMonth.TranscriptionSeconds, 3);
+    }
+
+    [Fact]
+    public async Task Debug_log_receives_transcript_and_inserted_text()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Ähm, Hallo.";
+        _smart.Output = "Hallo.";
+
+        await DictateAsync(controller);
+
+        Assert.Equal(("notepad", ProcessingMode.Smart, "Ähm, Hallo.", "Hallo."), _debugLog.Entries.Single());
+    }
+
+    [Fact]
     public void Toggle_hotkey_switches_mode_and_informs_user()
     {
         var controller = CreateController();
@@ -527,6 +595,21 @@ public class DictationControllerTests : IDisposable
             Requests.Add(request);
             return Error is null ? Task.FromResult(Output) : Task.FromException<string>(Error);
         }
+    }
+
+    private sealed class FakePasswordFields : IPasswordFieldDetector
+    {
+        public bool IsPassword { get; set; }
+
+        public bool IsFocusInPasswordField() => IsPassword;
+    }
+
+    private sealed class FakeDebugLog : IDictationDebugLog
+    {
+        public List<(string, ProcessingMode, string, string)> Entries { get; } = [];
+
+        public void Record(string application, ProcessingMode mode, string transcript, string insertedText) =>
+            Entries.Add((application, mode, transcript, insertedText));
     }
 
     private sealed class FakeSounds : ISoundService

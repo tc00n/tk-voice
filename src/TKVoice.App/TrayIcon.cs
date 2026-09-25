@@ -24,6 +24,7 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
     private readonly ProcessingModeState _mode;
     private DictationState _state = DictationState.Idle;
     private bool _active = true;
+    private bool _debugMode;
 
     public TrayIcon(ProcessingModeState mode, ILog log)
     {
@@ -66,6 +67,20 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
         UpdateIcon();
     });
 
+    /// <summary>NFR-007: debug mode must be clearly visible while it records content.</summary>
+    public void SetDebugMode(bool enabled) => OnUiThread(() =>
+    {
+        var changed = _debugMode != enabled;
+        _debugMode = enabled;
+        UpdateIcon();
+        if (enabled && changed)
+        {
+            _notifyIcon.ShowBalloonTip(6000, "TK Voice – Debug-Modus aktiv",
+                "Diktierte Inhalte werden zur Fehlersuche gespeichert. Abschalten und löschen unter Einstellungen → Diagnose.",
+                ToolTipIcon.Warning);
+        }
+    });
+
     public void ShowError(string message) => OnUiThread(() => _notifyIcon.ShowBalloonTip(5000, "TK Voice", message, ToolTipIcon.Warning));
 
     public void ShowInfo(string message) => OnUiThread(() => _notifyIcon.ShowBalloonTip(3000, "TK Voice", message, ToolTipIcon.Info));
@@ -84,10 +99,11 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
 
     private void UpdateIcon()
     {
+        var suffix = _debugMode ? " (DEBUG-MODUS)" : string.Empty;
         if (!_active && _state == DictationState.Idle)
         {
             _notifyIcon.Icon = _pausedIcon;
-            _notifyIcon.Text = "TK Voice – pausiert";
+            _notifyIcon.Text = "TK Voice – pausiert" + suffix;
             return;
         }
 
@@ -97,7 +113,7 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
             DictationState.Recording => "TK Voice – Aufnahme",
             DictationState.Processing => "TK Voice – Verarbeitung",
             _ => "TK Voice",
-        };
+        } + suffix;
     }
 
     internal static void OpenLogs(ILog log)

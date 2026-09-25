@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,6 +9,7 @@ using TKVoice.Core.Settings;
 using TKVoice.Infrastructure;
 using TKVoice.Infrastructure.Audio;
 using TKVoice.Infrastructure.Hotkeys;
+using TKVoice.Infrastructure.Logging;
 using TKVoice.Infrastructure.Targeting;
 using TKVoice.OpenAI;
 
@@ -22,6 +24,7 @@ public enum SettingsPage
     Dictionary,
     AppRules,
     OpenAI,
+    Costs,
     Diagnostics,
 }
 
@@ -48,6 +51,7 @@ public partial class SettingsWindow : Window
         DictionaryEditor.Bind(App.Current.Shared.Dictionary);
         LoadRules();
         LoadOpenAI();
+        LoadCosts();
         LoadDiagnostics();
         ShowPage(page);
     }
@@ -353,12 +357,64 @@ public partial class SettingsWindow : Window
         }
     }
 
+    // Costs
+
+    private static readonly CultureInfo German = CultureInfo.GetCultureInfo("de-DE");
+
+    private void LoadCosts()
+    {
+        var costs = _settings.Costs;
+        var usage = App.Current.Shared.Usage.CurrentMonth;
+        var month = DateTime.ParseExact(usage.Month, "yyyy-MM", CultureInfo.InvariantCulture);
+        UsageTitle.Text = $"Verbrauch {month.ToString("MMMM yyyy", German)} (Schätzung)";
+        UsageAmount.Text = $"{usage.EstimatedCostUsd.ToString("0.00", German)} $";
+        UsageDetails.Text =
+            $"{(usage.TranscriptionSeconds / 60).ToString("0.0", German)} Min. Audio · {usage.TranscriptionRequests} Diktate · " +
+            $"{usage.SmartRequests} Smart-Anfragen · {(usage.SmartInputTokens + usage.SmartOutputTokens).ToString("N0", German)} Tokens";
+        if (costs.MonthlyLimitUsd > 0)
+        {
+            var percent = Math.Min(100, usage.EstimatedCostUsd / costs.MonthlyLimitUsd * 100);
+            BudgetBar.Value = percent;
+            BudgetText.Text = $"{percent.ToString("0", German)} % von {costs.MonthlyLimitUsd.ToString("0.00", German)} $";
+        }
+        else
+        {
+            BudgetBar.Value = 0;
+            BudgetText.Text = "Kein Monatslimit";
+        }
+
+        LimitBox.Text = costs.MonthlyLimitUsd.ToString("0.##", German);
+        ThresholdsBox.Text = string.Join(", ", costs.WarningThresholdsPercent);
+        PriceTranscriptionBox.Text = costs.TranscriptionUsdPerMinute.ToString("0.####", German);
+        PriceInputBox.Text = costs.SmartInputUsdPerMillionTokens.ToString("0.####", German);
+        PriceOutputBox.Text = costs.SmartOutputUsdPerMillionTokens.ToString("0.####", German);
+        FastMultiplierBox.Text = costs.FastModeMultiplier.ToString("0.##", German);
+    }
+
     // Diagnostics
 
-    private void LoadDiagnostics() =>
+    private void LoadDiagnostics()
+    {
         LogLevelBox.SelectedItem = LogLevelBox.Items.Cast<ComboBoxItem>()
             .FirstOrDefault(i => string.Equals((string)i.Content, _settings.Diagnostics.LogLevel, StringComparison.OrdinalIgnoreCase))
             ?? LogLevelBox.Items[1];
+        DebugModeBox.IsChecked = _settings.Diagnostics.DebugMode;
+    }
+
+    private void OnDeleteDebugData(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            FileDictationDebugLog.DeleteAll(AppPaths.DebugDirectory);
+            DebugResult.Text = "Debug-Daten gelöscht.";
+            DebugResult.Visibility = Visibility.Visible;
+        }
+        catch (IOException ex)
+        {
+            DebugResult.Text = "Löschen fehlgeschlagen: " + ex.Message;
+            DebugResult.Visibility = Visibility.Visible;
+        }
+    }
 
     private void OnOpenLogs(object sender, RoutedEventArgs e) => TrayIcon.OpenLogs(App.Current.Log);
 
@@ -393,6 +449,24 @@ public partial class SettingsWindow : Window
         var timeout = ReadInt(TimeoutBox, "Timeout Transkription", 3, 300, errors);
         var smartTimeout = ReadInt(SmartTimeoutBox, "Timeout Smart Processing", 2, 120, errors);
         var retries = ReadInt(RetriesBox, "Wiederholungen", 0, 5, errors);
+        var limit = ReadDecimal(LimitBox, "Monatslimit", 0, 100_000, errors);
+        var priceTranscription = ReadDecimal(PriceTranscriptionBox, "Preis Transkription", 0, 100, errors);
+        var priceInput = ReadDecimal(PriceInputBox, "Preis Eingabe", 0, 10_000, errors);
+        var priceOutput = ReadDecimal(PriceOutputBox, "Preis Ausgabe", 0, 10_000, errors);
+        var fastMultiplier = ReadDecimal(FastMultiplierBox, "Fast-mode-Faktor", 1, 10, errors);
+        var thresholds = new List<int>();
+        foreach (var part in SplitList(ThresholdsBox.Text.Replace(' ', ',')))
+        {
+            if (int.TryParse(part.TrimEnd('%'), out var threshold) && threshold is > 0 and < 100)
+            {
+                thresholds.Add(threshold);
+            }
+            else
+            {
+                errors.Add("Warnschwellen: Prozentwerte zwischen 1 und 99, z. B. „50, 80“.");
+                break;
+            }
+        }
         if (string.IsNullOrWhiteSpace(TranscriptionModelBox.Text) || string.IsNullOrWhiteSpace(SmartModelBox.Text))
         {
             errors.Add("Beide OpenAI-Modelle müssen angegeben sein.");
@@ -434,7 +508,15 @@ public partial class SettingsWindow : Window
         _settings.OpenAI.SmartProcessingServiceTier = FastModeBox.IsChecked == true ? "fast" : "default";
         _settings.OpenAI.Languages = SplitList(LanguagesBox.Text).Select(l => l.ToLowerInvariant()).ToList();
 
+        _settings.Costs.MonthlyLimitUsd = limit;
+        _settings.Costs.WarningThresholdsPercent = thresholds.Distinct().Order().ToList();
+        _settings.Costs.TranscriptionUsdPerMinute = priceTranscription;
+        _settings.Costs.SmartInputUsdPerMillionTokens = priceInput;
+        _settings.Costs.SmartOutputUsdPerMillionTokens = priceOutput;
+        _settings.Costs.FastModeMultiplier = fastMultiplier;
+
         _settings.Diagnostics.LogLevel = (string)((ComboBoxItem)LogLevelBox.SelectedItem).Content;
+        _settings.Diagnostics.DebugMode = DebugModeBox.IsChecked == true;
 
         var newKey = ApiKeyBox.Password.Trim();
         if (newKey.Length > 0)
@@ -465,6 +547,19 @@ public partial class SettingsWindow : Window
         }
 
         errors.Add($"{name}: bitte eine Zahl von {min} bis {max} eingeben.");
+        return min;
+    }
+
+    private static double ReadDecimal(TextBox box, string name, double min, double max, List<string> errors)
+    {
+        var text = box.Text.Trim();
+        if ((double.TryParse(text, NumberStyles.Float, German, out var value) || double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+            && value >= min && value <= max)
+        {
+            return value;
+        }
+
+        errors.Add($"{name}: bitte eine Zahl von {min.ToString(German)} bis {max.ToString("N0", German)} eingeben.");
         return min;
     }
 

@@ -17,6 +17,7 @@ public sealed class TKVoiceSettings
     /// <summary>App-specific smart processing styles (FR-024), matched by process name.</summary>
     public List<AppRule> AppRules { get; set; } = AppRule.Defaults();
     public OpenAISettings OpenAI { get; set; } = new();
+    public CostSettings Costs { get; set; } = new();
     public DiagnosticsSettings Diagnostics { get; set; } = new();
 }
 
@@ -153,4 +154,26 @@ public sealed class DiagnosticsSettings
 {
     /// <summary>Debug, Info, Warn or Error.</summary>
     public string LogLevel { get; set; } = "Info";
+
+    /// <summary>
+    /// NFR-007: records transcript and inserted text per dictation into a separate debug folder.
+    /// Off by default; clearly indicated while on.
+    /// </summary>
+    public bool DebugMode { get; set; }
+}
+
+/// <summary>Cost estimation and local budget (FR-040/041). Prices in US dollars as billed by OpenAI.</summary>
+public sealed class CostSettings
+{
+    /// <summary>Monthly limit in USD; 0 = no limit. Dictation is blocked once it is reached.</summary>
+    public double MonthlyLimitUsd { get; set; }
+
+    public List<int> WarningThresholdsPercent { get; set; } = [50, 80];
+
+    public double TranscriptionUsdPerMinute { get; set; } = 0.017;
+    public double SmartInputUsdPerMillionTokens { get; set; } = 0.10;
+    public double SmartOutputUsdPerMillionTokens { get; set; } = 0.50;
+
+    /// <summary>Price factor of OpenAI Fast mode.</summary>
+    public double FastModeMultiplier { get; set; } = 2.0;
 }

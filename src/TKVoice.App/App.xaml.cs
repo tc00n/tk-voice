@@ -7,6 +7,7 @@ using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
+using TKVoice.Core.Usage;
 using TKVoice.Infrastructure;
 using TKVoice.Infrastructure.Clipboard;
 using TKVoice.Infrastructure.Logging;
@@ -24,6 +25,7 @@ public partial class App : Application
     private TKVoiceSettings _settings = new();
     private FileLog? _log;
     private TrayIcon? _tray;
+    private FlowBarWindow? _flowBar;
     private Win32ClipboardService? _clipboard;
     private SharedServices? _shared;
     private TKVoiceRuntime? _runtime;
@@ -66,9 +68,18 @@ public partial class App : Application
         var mode = new ProcessingModeState(ParseMode(_settings.Processing.DefaultMode));
         _tray = new TrayIcon(mode, _log);
         _tray.SetActive(IsActive);
-        var notifier = new CompositeNotifier(_tray, new FlowBarOverlay(new FlowBarWindow()));
+        _flowBar = new FlowBarWindow();
+        var notifier = new CompositeNotifier(_tray, new FlowBarOverlay(_flowBar));
         _clipboard = new Win32ClipboardService(SynchronizationContext.Current!, _log);
-        _shared = new SharedServices(_log, credentials, dictionary, mode, _clipboard, notifier, () => IsActive);
+        var usage = new UsageTracker(AppPaths.UsageFile, () => _settings.Costs);
+        usage.BudgetWarning += (_, message) =>
+        {
+            _log.Warn("Budget threshold reached.");
+            notifier.ShowError(message);
+        };
+        var passwordFields = new UiaPasswordFieldDetector(_log);
+        passwordFields.Warmup();
+        _shared = new SharedServices(_log, credentials, dictionary, mode, _clipboard, notifier, usage, passwordFields, () => IsActive);
 
         StartRuntime();
         SyncAutostart();
@@ -177,6 +188,14 @@ public partial class App : Application
     private void StartRuntime()
     {
         _runtime = new TKVoiceRuntime(_settings, _shared!);
+        var debug = _settings.Diagnostics.DebugMode;
+        _tray!.SetDebugMode(debug);
+        _flowBar!.SetDebugMode(debug);
+        if (debug)
+        {
+            _log!.Warn("Debug mode is ON: dictated content is recorded.");
+        }
+
         foreach (var problem in _runtime.HotkeyProblems)
         {
             _tray!.ShowError(problem);

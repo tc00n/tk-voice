@@ -86,6 +86,31 @@ public class SmartProcessingTests
     }
 
     [Fact]
+    public async Task Successful_request_is_recorded_as_usage()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "tkvoice-tests-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var usage = new TKVoice.Core.Usage.UsageTracker(Path.Combine(directory, "usage.json"), () => new CostSettings());
+            var handler = new RecordingHandler(HttpStatusCode.OK,
+                """{"id":"r","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Ok."}]}],"usage":{"input_tokens":900,"output_tokens":10}}""");
+            using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new ProcessingSettings(), new FakeCredentials("sk"), () => [], new NullLog(), handler, usage: usage);
+
+            await processor.ProcessAsync(new TextProcessingRequest("ok", "notepad"), CancellationToken.None);
+
+            Assert.Equal(1, usage.CurrentMonth.SmartRequests);
+            Assert.Equal(900, usage.CurrentMonth.SmartInputTokens);
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Processor_surfaces_api_error_message()
     {
         var handler = new RecordingHandler(HttpStatusCode.Unauthorized, """{"error":{"code":"invalid_api_key","message":"Incorrect API key provided"}}""");

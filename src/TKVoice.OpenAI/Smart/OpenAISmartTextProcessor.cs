@@ -5,6 +5,7 @@ using TKVoice.Core.Abstractions;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Reliability;
 using TKVoice.Core.Settings;
+using TKVoice.Core.Usage;
 
 namespace TKVoice.OpenAI.Smart;
 
@@ -21,6 +22,7 @@ public sealed class OpenAISmartTextProcessor : ISmartTextProcessor, IDisposable
     private readonly ILog _log;
     private readonly HttpClient _http;
     private readonly Func<int, TimeSpan>? _backoff;
+    private readonly UsageTracker? _usage;
 
     public OpenAISmartTextProcessor(
         OpenAISettings settings,
@@ -29,8 +31,10 @@ public sealed class OpenAISmartTextProcessor : ISmartTextProcessor, IDisposable
         Func<IReadOnlyList<string>> vocabulary,
         ILog log,
         HttpMessageHandler? handler = null,
-        Func<int, TimeSpan>? backoff = null)
+        Func<int, TimeSpan>? backoff = null,
+        UsageTracker? usage = null)
     {
+        _usage = usage;
         _settings = settings;
         _processing = processing;
         _backoff = backoff;
@@ -102,6 +106,10 @@ public sealed class OpenAISmartTextProcessor : ISmartTextProcessor, IDisposable
         }
 
         var result = ResponsesProtocol.ParseResponse(json);
+        _usage?.RecordSmartProcessing(
+            result.InputTokens,
+            result.OutputTokens,
+            string.Equals(_settings.SmartProcessingServiceTier, "fast", StringComparison.OrdinalIgnoreCase));
         _log.Info($"Smart processing model {_settings.SmartProcessingModel}, request {requestId}, " +
                   $"{stopwatch.ElapsedMilliseconds} ms, tokens in {result.InputTokens} / out {result.OutputTokens}.");
         return result.Text;

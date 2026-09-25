@@ -15,6 +15,7 @@ namespace TKVoice.Infrastructure.TextInsertion;
 public sealed class WindowsTextInsertionService(
     Win32ClipboardService clipboard,
     InsertionSettings settings,
+    IPasswordFieldDetector passwordFields,
     ILog log) : ITextInsertionService
 {
     private static readonly TimeSpan ModifierReleaseTimeout = TimeSpan.FromSeconds(3);
@@ -50,6 +51,12 @@ public sealed class WindowsTextInsertionService(
 
         RestoreFocusedControl(target);
         var focusMs = stopwatch.ElapsedMilliseconds - modifiersMs;
+
+        // The field may have changed since the dictation started (FR-038).
+        if (passwordFields.IsFocusInPasswordField())
+        {
+            return InsertionResult.PasswordField;
+        }
 
         var method = InsertionMethodSelector.Select(settings, target.ProcessName);
         if (method == InsertionMethod.Paste && !TryPaste(text))

@@ -74,6 +74,9 @@ public partial class FlowBarWindow : Window
         new WindowInteropHelper(this).EnsureHandle();
     }
 
+    /// <summary>NFR-007: a visible badge while debug mode records content.</summary>
+    public void SetDebugMode(bool enabled) => DebugBadge.Visibility = enabled ? Visibility.Visible : Visibility.Collapsed;
+
     /// <summary>Hands-free recordings show a label with elapsed time, since no key is being held.</summary>
     public void SetHandsFree(bool handsFree)
     {

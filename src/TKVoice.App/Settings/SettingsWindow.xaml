@@ -60,6 +60,7 @@
                 <ListBoxItem Tag="Dictionary"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE82D;" /><TextBlock Text="Wörterbuch" /></StackPanel></ListBoxItem>
                 <ListBoxItem Tag="AppRules"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE71D;" /><TextBlock Text="App-Regeln" /></StackPanel></ListBoxItem>
                 <ListBoxItem Tag="OpenAI"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE753;" /><TextBlock Text="OpenAI" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="Costs"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE8EF;" /><TextBlock Text="Kosten" /></StackPanel></ListBoxItem>
                 <ListBoxItem Tag="Diagnostics"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE9D9;" /><TextBlock Text="Diagnose" /></StackPanel></ListBoxItem>
             </ListBox>
         </DockPanel>
@@ -418,6 +419,106 @@
                 </ScrollViewer>
             </TabItem>
 
+            <TabItem Tag="Costs">
+                <ScrollViewer Style="{StaticResource Page}">
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="Kosten" Style="{StaticResource PageTitle}" />
+                        <Border Style="{StaticResource Card}" Padding="20,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock x:Name="UsageTitle" Style="{StaticResource CardDescription}" FontSize="13" />
+                                    <TextBlock x:Name="UsageAmount" FontSize="32" FontWeight="SemiBold" Margin="0,4,0,4" />
+                                    <TextBlock x:Name="UsageDetails" Style="{StaticResource CardDescription}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" MinWidth="200">
+                                    <TextBlock x:Name="BudgetText" Style="{StaticResource CardDescription}" HorizontalAlignment="Right" Margin="0,0,0,6" />
+                                    <ProgressBar x:Name="BudgetBar" Height="6" Maximum="100" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <TextBlock Style="{StaticResource Hint}" Margin="2,6,0,0" FontSize="12"
+                                   Text="Schätzung aus Audiodauer und Tokens mit den Preisen unten. Maßgeblich ist die Abrechnung im OpenAI-Konto." />
+
+                        <TextBlock Text="Budget" Style="{StaticResource GroupTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE8EF;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Monatslimit" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Bei Erreichen wird Diktieren bis Monatsende gesperrt. 0 = kein Limit." />
+                                </StackPanel>
+                                <TextBox x:Name="LimitBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="US-Dollar" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE7BA;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Warnschwellen" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Hinweis bei Erreichen, z. B. „50, 80“." />
+                                </StackPanel>
+                                <TextBox x:Name="ThresholdsBox" Grid.Column="2" Width="90" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="Prozent" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="Preise für die Schätzung" Style="{StaticResource GroupTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE720;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Transkription" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="gpt-live-transcribe: 0,017 $ pro Minute (Stand 09/2026)." />
+                                </StackPanel>
+                                <TextBox x:Name="PriceTranscriptionBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="$ / Minute" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE70F;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Smart Processing – Eingabe" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="gpt-6-luna: 0,10 $ pro Million Tokens." />
+                                </StackPanel>
+                                <TextBox x:Name="PriceInputBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="$ / Mio. Tokens" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE70F;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Smart Processing – Ausgabe" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="gpt-6-luna: 0,50 $ pro Million Tokens." />
+                                </StackPanel>
+                                <TextBox x:Name="PriceOutputBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="$ / Mio. Tokens" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE945;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Aufschlag Fast mode" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Preisfaktor, wenn Fast mode aktiv ist." />
+                                </StackPanel>
+                                <TextBox x:Name="FastMultiplierBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="Faktor" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem Tag="Diagnostics">
                 <ScrollViewer Style="{StaticResource Page}">
                     <StackPanel Style="{StaticResource PageContent}">
@@ -436,6 +537,22 @@
                                     <ComboBoxItem Content="Warn" />
                                     <ComboBoxItem Content="Error" />
                                 </ComboBox>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xEBE8;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Debug-Modus" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Foreground="{DynamicResource SystemFillColorCautionBrush}"
+                                               Text="Speichert Transkript und eingefügten Text jedes Diktats zur Fehlersuche. Nur bei Bedarf einschalten – solange aktiv, zeigen Tray und Flow Bar „DEBUG“." />
+                                    <TextBlock x:Name="DebugResult" Style="{StaticResource CardDescription}" Visibility="Collapsed" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Debug-Daten löschen" Margin="0,0,16,0" Click="OnDeleteDebugData" />
+                                    <CheckBox x:Name="DebugModeBox" Style="{StaticResource ToggleSwitch}" />
+                                </StackPanel>
                             </Grid>
                         </Border>
                         <Border Style="{StaticResource Card}">
