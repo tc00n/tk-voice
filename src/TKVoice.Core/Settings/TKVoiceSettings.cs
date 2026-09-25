@@ -7,6 +7,7 @@ namespace TKVoice.Core.Settings;
 /// </summary>
 public sealed class TKVoiceSettings
 {
+    public GeneralSettings General { get; set; } = new();
     public HotkeySettings Hotkeys { get; set; } = new();
     public AudioSettings Audio { get; set; } = new();
     public ProcessingSettings Processing { get; set; } = new();
@@ -17,6 +18,15 @@ public sealed class TKVoiceSettings
     public List<AppRule> AppRules { get; set; } = AppRule.Defaults();
     public OpenAISettings OpenAI { get; set; } = new();
     public DiagnosticsSettings Diagnostics { get; set; } = new();
+}
+
+public sealed class GeneralSettings
+{
+    /// <summary>Start TK Voice with Windows, in the background (FR-042).</summary>
+    public bool Autostart { get; set; }
+
+    /// <summary>False pauses TK Voice: hotkeys are ignored until it is activated again.</summary>
+    public bool Active { get; set; } = true;
 }
 
 public sealed class HotkeySettings
@@ -38,8 +48,11 @@ public sealed class HotkeySettings
 
 public sealed class AudioSettings
 {
-    /// <summary>WaveIn device number; -1 uses the Windows default microphone.</summary>
-    public int InputDeviceNumber { get; set; } = -1;
+    /// <summary>
+    /// Microphone name as listed by Windows; empty uses the Windows default microphone. Resolved
+    /// at the start of every dictation, so plugging devices in and out needs no restart (FR-004).
+    /// </summary>
+    public string InputDeviceName { get; set; } = string.Empty;
 
     /// <summary>Recordings shorter than this are treated as accidental taps and discarded.</summary>
     public int MinimumRecordingMilliseconds { get; set; } = 300;

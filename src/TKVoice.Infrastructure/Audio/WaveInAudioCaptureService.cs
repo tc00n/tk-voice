@@ -9,7 +9,7 @@ namespace TKVoice.Infrastructure.Audio;
 /// A watchdog reports a failure when no audio arrives for a while, since some devices simply go
 /// silent instead of raising an error when they are unplugged.
 /// </summary>
-public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAudioCaptureService
+public sealed class WaveInAudioCaptureService(string deviceName, ILog log) : IAudioCaptureService
 {
     private const int BufferMilliseconds = 50;
     private static readonly TimeSpan NoDataTimeout = TimeSpan.FromSeconds(2);
@@ -29,6 +29,12 @@ public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAud
         if (_waveIn is not null)
         {
             throw new InvalidOperationException("Audio capture is already running.");
+        }
+
+        var deviceNumber = MicrophoneCatalog.Resolve(deviceName);
+        if (deviceNumber == MicrophoneCatalog.DefaultDevice && !string.IsNullOrWhiteSpace(deviceName))
+        {
+            log.Warn("Configured microphone not found; using the Windows default microphone.");
         }
 
         _onChunk = onChunk;

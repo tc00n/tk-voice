@@ -26,6 +26,31 @@ public class HotkeyTests
         Assert.NotEmpty(error);
     }
 
+    [Theory]
+    [InlineData(new[] { "Space", "RightCtrl" }, "RightCtrl+Space")]
+    [InlineData(new[] { "F12", "Shift", "Ctrl" }, "Ctrl+Shift+F12")]
+    [InlineData(new[] { "Win", "Alt", "A" }, "Alt+Win+A")]
+    [InlineData(new[] { "RightCtrl" }, "RightCtrl")]
+    public void Format_orders_modifiers_first(string[] keys, string expected)
+    {
+        Assert.Equal(expected, HotkeyGesture.Format(keys));
+        Assert.True(HotkeyGesture.TryParse(expected, out _, out _));
+    }
+
+    [Fact]
+    public void Format_ignores_unknown_keys()
+    {
+        Assert.Null(HotkeyGesture.Format(["Hyper"]));
+    }
+
+    [Fact]
+    public void Equivalent_gestures_are_detected_regardless_of_order_and_case()
+    {
+        Assert.True(HotkeyGesture.Parse("Ctrl+Shift+F12").IsEquivalentTo(HotkeyGesture.Parse("shift+ctrl+f12")));
+        Assert.False(HotkeyGesture.Parse("Ctrl+F12").IsEquivalentTo(HotkeyGesture.Parse("RightCtrl+F12")));
+        Assert.False(HotkeyGesture.Parse("RightCtrl").IsEquivalentTo(HotkeyGesture.Parse("RightCtrl+Space")));
+    }
+
     [Fact]
     public void Push_to_talk_presses_on_down_and_releases_on_up()
     {

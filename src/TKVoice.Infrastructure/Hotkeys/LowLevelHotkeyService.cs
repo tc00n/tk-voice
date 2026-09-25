@@ -38,6 +38,14 @@ public sealed class LowLevelHotkeyService : IHotkeyService
         _hookProc = HookCallback;
     }
 
+    private volatile bool _suspended;
+
+    public bool Suspended
+    {
+        get => _suspended;
+        set => _suspended = value;
+    }
+
     public event EventHandler<HotkeyAction>? Pressed;
     public event EventHandler<HotkeyAction>? Released;
 
@@ -134,7 +142,7 @@ public sealed class LowLevelHotkeyService : IHotkeyService
             return _swallowed.Remove(vk);
         }
 
-        if (IsModifier(vk))
+        if (_suspended || IsModifier(vk))
         {
             return false;
         }
@@ -221,6 +229,11 @@ public sealed class LowLevelHotkeyService : IHotkeyService
 
     private void Raise(IReadOnlyList<(HotkeyAction Action, bool Pressed)> transitions)
     {
+        if (_suspended)
+        {
+            return;
+        }
+
         foreach (var (action, pressed) in transitions)
         {
             (pressed ? Pressed : Released)?.Invoke(this, action);

@@ -218,3 +218,27 @@ Streamens, vollständiger Text in korrekter Reihenfolge, Ergebnis 0,7 s nach Sto
 
 Verifiziert gegen die API: 19,6 s TTS-Sprache in 6 Sessions/Segmenten korrekt transkribiert; nicht
 erreichbarer Server → 3 Versuche mit Replay, klare Fehlermeldung nach 2,6 s.
+
+## ADR-017 – Einstellungsfenster, Tray, Autostart (Phase 9)
+
+- **Laufzeit neu aufbauen statt Neustart:** `TKVoiceRuntime` bündelt alles, was aus den Einstellungen
+  entsteht (Pipeline, Hotkeys). „Speichern“ schreibt `settings.json` und baut die Runtime neu auf –
+  bei laufendem Diktat erst danach. Tray, Flow Bar, Wörterbuch, Modus und Zwischenablage-Owner bleiben.
+- **Einstellungsfenster „TK Voice – Settings“** (§36): Allgemein, Hotkeys, Audio, Verarbeitung, Wörterbuch,
+  App-Regeln, OpenAI, Diagnose. Bearbeitet eine Kopie; Wörterbuch-Änderungen gelten sofort.
+  Kosten folgen mit Usage Tracking in Phase 10.
+- **Hotkey-Aufnahme:** Kombination drücken, übernommen beim Loslassen. Rechte Modifier werden als solche
+  gespeichert („RightCtrl“), linke generisch („Ctrl“). Während der Aufnahme sind die globalen Hotkeys
+  ausgesetzt (`IHotkeyService.Suspended`), sonst würde z. B. die Leertaste verschluckt.
+- **Konflikte (FR-001):** doppelte Belegung innerhalb von TK Voice blockiert das Speichern; von anderen
+  Programmen registrierte Kombinationen werden per Probe-`RegisterHotKey` erkannt und als Warnung angezeigt
+  (nur für Modifier + eine Taste möglich).
+- **Mikrofon per Name** (`Audio.InputDeviceName`), bei jeder Aufnahme neu aufgelöst → Geräte an-/abstecken
+  ohne Neustart (FR-004); nicht gefundenes Gerät → Windows-Standard mit Log-Warnung.
+- **Tray (FR-043):** aktiv/pausiert (graues Icon, Hotkeys ignoriert, persistiert), Smart/Raw, Einstellungen,
+  Wörterbuch, Logs, Beenden; Doppelklick öffnet die Einstellungen.
+- **Autostart (FR-042):** `HKCU\...\Run\TK Voice` mit dem Pfad der laufenden EXE; beim Start abgeglichen.
+- **OpenAI:** Key-Eingabe (Credential Manager), „Verbindung testen“ prüft Key und beide Modelle über
+  `GET /v1/models/{id}`. Der separate API-Key-Dialog entfällt; ohne Key öffnen sich beim Start die Einstellungen.
+- **App-Regeln:** „Anwendung erkennen“ gibt 3 s Zeit, zum Zielprogramm zu wechseln, und übernimmt dessen
+  Prozessnamen.

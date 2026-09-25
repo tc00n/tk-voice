@@ -31,6 +31,10 @@ public sealed class JsonSettingsStore(string filePath)
         return settings;
     }
 
+    /// <summary>Deep copy, e.g. for editing in the settings window without touching the live settings.</summary>
+    public static TKVoiceSettings Clone(TKVoiceSettings settings) =>
+        JsonSerializer.Deserialize<TKVoiceSettings>(JsonSerializer.Serialize(settings, Options), Options)!;
+
     public void Save(TKVoiceSettings settings)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);

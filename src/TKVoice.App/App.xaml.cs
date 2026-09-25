@@ -1,35 +1,43 @@
 using System.Windows;
+using System.Windows.Threading;
 using TKVoice.App.FlowBar;
+using TKVoice.App.Settings;
 using TKVoice.Core.Abstractions;
-using TKVoice.Core.Dictation;
 using TKVoice.Core.Dictionary;
 using TKVoice.Core.Hotkeys;
 using TKVoice.Core.Processing;
 using TKVoice.Core.Settings;
 using TKVoice.Infrastructure;
-using TKVoice.Infrastructure.Audio;
 using TKVoice.Infrastructure.Clipboard;
-using TKVoice.Infrastructure.Hotkeys;
 using TKVoice.Infrastructure.Logging;
 using TKVoice.Infrastructure.Security;
-using TKVoice.Infrastructure.Targeting;
-using TKVoice.Infrastructure.TextInsertion;
-using TKVoice.OpenAI;
-using TKVoice.OpenAI.Smart;
 
 namespace TKVoice.App;
 
-/// <summary>Composition root. TK Voice runs in the background with a tray icon and no main window.</summary>
+/// <summary>Composition root. TK Voice runs in the background with a tray icon and no main window (FR-042).</summary>
 public partial class App : Application
 {
     private const string SingleInstanceMutexName = @"Local\TKVoice.SingleInstance";
 
     private Mutex? _singleInstance;
+    private JsonSettingsStore? _store;
+    private TKVoiceSettings _settings = new();
     private FileLog? _log;
     private TrayIcon? _tray;
-    private IHotkeyService? _hotkeys;
     private Win32ClipboardService? _clipboard;
-    private OpenAISmartTextProcessor? _smartProcessor;
+    private SharedServices? _shared;
+    private TKVoiceRuntime? _runtime;
+    private SettingsWindow? _settingsWindow;
+
+    internal static new App Current => (App)Application.Current;
+
+    internal TKVoiceSettings Settings => _settings;
+
+    internal SharedServices Shared => _shared!;
+
+    internal FileLog Log => _log!;
+
+    internal bool IsActive => _settings.General.Active;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -43,8 +51,9 @@ public partial class App : Application
             return;
         }
 
-        var settings = new JsonSettingsStore(AppPaths.SettingsFile).LoadOrCreate();
-        _log = new FileLog(AppPaths.LogDirectory, settings.Diagnostics.LogLevel);
+        _store = new JsonSettingsStore(AppPaths.SettingsFile);
+        _settings = _store.LoadOrCreate();
+        _log = new FileLog(AppPaths.LogDirectory, _settings.Diagnostics.LogLevel);
         _log.Info($"TK Voice {typeof(App).Assembly.GetName().Version} starting.");
         DispatcherUnhandledException += (_, args) =>
         {
@@ -53,98 +62,135 @@ public partial class App : Application
         };
 
         var credentials = new WindowsCredentialService();
-        var mode = new ProcessingModeState(
-            Enum.TryParse<ProcessingMode>(settings.Processing.DefaultMode, ignoreCase: true, out var defaultMode) ? defaultMode : ProcessingMode.Smart);
         var dictionary = new PersonalDictionary(AppPaths.DictionaryFile);
-        DictationController? controller = null;
-        _tray = new TrayIcon(credentials, mode, () => controller?.OnHotkeyPressed(HotkeyAction.ToggleSmartRaw), dictionary, _log);
+        var mode = new ProcessingModeState(ParseMode(_settings.Processing.DefaultMode));
+        _tray = new TrayIcon(mode, _log);
+        _tray.SetActive(IsActive);
         var notifier = new CompositeNotifier(_tray, new FlowBarOverlay(new FlowBarWindow()));
-
         _clipboard = new Win32ClipboardService(SynchronizationContext.Current!, _log);
-        _smartProcessor = new OpenAISmartTextProcessor(settings.OpenAI, settings.Processing, credentials, () => dictionary.Terms, _log);
-        var addToDictionary = new AddToDictionaryCommand(new ClipboardSelectionReader(_clipboard, _log), dictionary, notifier, _log);
+        _shared = new SharedServices(_log, credentials, dictionary, mode, _clipboard, notifier, () => IsActive);
 
-        controller = new DictationController(
-            new WaveInAudioCaptureService(settings.Audio.InputDeviceNumber, _log),
-            new RealtimeTranscriptionService(
-                settings.OpenAI,
-                settings.Processing,
-                credentials,
-                () => dictionary.Terms.TakeLast(settings.Dictionary.MaxTranscriptionKeywords).ToList(),
-                _log),
-            _smartProcessor,
-            mode,
-            dictionary,
-            new ForegroundWindowTargetCaptureService(settings.Processing.SendWindowTitle, _log),
-            new WindowsTextInsertionService(_clipboard, settings.Insertion, _log),
-            notifier,
-            new ToneSoundService(settings.Audio.SoundsEnabled, settings.Audio.SoundVolume, _log),
-            _log,
-            settings);
-
-        _hotkeys = new LowLevelHotkeyService(_log);
-        _hotkeys.Pressed += (_, action) =>
-        {
-            if (action == HotkeyAction.AddToDictionary)
-            {
-                addToDictionary.Execute();
-            }
-            else
-            {
-                controller.OnHotkeyPressed(action);
-            }
-        };
-        _hotkeys.Released += (_, action) => controller.OnHotkeyReleased(action);
-
-        var pushToTalk = RegisterHotkey(HotkeyAction.PushToTalk, settings.Hotkeys.PushToTalk, new HotkeySettings().PushToTalk);
-        RegisterHotkey(HotkeyAction.HandsFreeToggle, settings.Hotkeys.HandsFree, fallback: null);
-        RegisterHotkey(HotkeyAction.ToggleSmartRaw, settings.Hotkeys.ToggleSmartRaw, fallback: null);
-        RegisterHotkey(HotkeyAction.AddToDictionary, settings.Hotkeys.AddToDictionary, fallback: null);
-        _hotkeys.Start();
+        StartRuntime();
+        SyncAutostart();
 
         if (string.IsNullOrWhiteSpace(credentials.GetOpenAIApiKey()))
         {
-            _tray.PromptForApiKey();
+            OpenSettings(SettingsPage.OpenAI);
         }
         else
         {
-            _tray.ShowInfo($"TK Voice ist aktiv ({mode.Current}). Push-to-talk: {pushToTalk}.");
+            _tray.ShowInfo(IsActive
+                ? $"TK Voice ist aktiv ({mode.Current}). Push-to-talk: {_runtime!.PushToTalk}."
+                : "TK Voice ist pausiert.");
         }
-    }
-
-    /// <summary>Registers a configured hotkey; an invalid one falls back to the default or stays disabled.</summary>
-    private HotkeyGesture? RegisterHotkey(HotkeyAction action, string configured, string? fallback)
-    {
-        if (string.IsNullOrWhiteSpace(configured) && fallback is null)
-        {
-            return null;
-        }
-
-        if (!HotkeyGesture.TryParse(configured, out var gesture, out var error))
-        {
-            _log!.Warn(error);
-            if (fallback is null)
-            {
-                _tray!.ShowError($"{error} Hotkey deaktiviert.");
-                return null;
-            }
-
-            _tray!.ShowError($"{error} Standard wird verwendet.");
-            gesture = HotkeyGesture.Parse(fallback);
-        }
-
-        _hotkeys!.Register(action, gesture);
-        return gesture;
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _hotkeys?.Dispose();
+        _runtime?.Dispose();
         _clipboard?.Dispose();
-        _smartProcessor?.Dispose();
         _tray?.Dispose();
         _log?.Info("TK Voice stopped.");
         _singleInstance?.Dispose();
         base.OnExit(e);
     }
+
+    internal void ToggleMode() => _runtime?.Controller.OnHotkeyPressed(HotkeyAction.ToggleSmartRaw);
+
+    internal void SetActive(bool active)
+    {
+        _settings.General.Active = active;
+        _store!.Save(_settings);
+        _tray!.SetActive(active);
+        _log!.Info(active ? "TK Voice activated." : "TK Voice paused.");
+    }
+
+    internal void OpenSettings(SettingsPage page = SettingsPage.General)
+    {
+        if (_settingsWindow is null)
+        {
+            _settingsWindow = new SettingsWindow(JsonSettingsStore.Clone(_settings), page);
+            _settingsWindow.Closed += (_, _) =>
+            {
+                _settingsWindow = null;
+                SuspendHotkeys(false);
+            };
+            _settingsWindow.Show();
+        }
+        else
+        {
+            _settingsWindow.ShowPage(page);
+        }
+
+        _settingsWindow.Activate();
+    }
+
+    /// <summary>While the settings window records a hotkey, the live hotkeys must stay quiet.</summary>
+    internal void SuspendHotkeys(bool suspended)
+    {
+        if (_runtime is not null)
+        {
+            _runtime.Hotkeys.Suspended = suspended;
+        }
+    }
+
+    /// <summary>Saves and applies new settings. Waits for a running dictation to finish first.</summary>
+    internal void ApplySettings(TKVoiceSettings updated)
+    {
+        _settings = updated;
+        _store!.Save(_settings);
+        _log!.SetMinimumLevel(_settings.Diagnostics.LogLevel);
+        _tray!.SetActive(IsActive);
+        SyncAutostart();
+        _log.Info("Settings saved.");
+
+        if (_runtime?.Controller.State is DictationState.Recording or DictationState.Processing)
+        {
+            var wait = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+            wait.Tick += (_, _) =>
+            {
+                if (_runtime?.Controller.State == DictationState.Idle)
+                {
+                    wait.Stop();
+                    RestartRuntime();
+                }
+            };
+            wait.Start();
+        }
+        else
+        {
+            RestartRuntime();
+        }
+    }
+
+    private void RestartRuntime()
+    {
+        _runtime?.Dispose();
+        _runtime = null;
+        StartRuntime();
+    }
+
+    private void StartRuntime()
+    {
+        _runtime = new TKVoiceRuntime(_settings, _shared!);
+        foreach (var problem in _runtime.HotkeyProblems)
+        {
+            _tray!.ShowError(problem);
+        }
+    }
+
+    private void SyncAutostart()
+    {
+        try
+        {
+            AutostartService.Apply(_settings.General.Autostart);
+        }
+        catch (Exception ex)
+        {
+            _log!.Error("Autostart could not be configured.", ex);
+        }
+    }
+
+    private static ProcessingMode ParseMode(string value) =>
+        Enum.TryParse<ProcessingMode>(value, ignoreCase: true, out var mode) ? mode : ProcessingMode.Smart;
 }

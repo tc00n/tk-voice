@@ -27,6 +27,32 @@ public sealed class HotkeyGesture
 
     public override string ToString() => Text;
 
+    private static readonly string[] ModifierOrder =
+        ["Ctrl", "LeftCtrl", "RightCtrl", "Shift", "LeftShift", "RightShift", "Alt", "LeftAlt", "RightAlt", "Win", "LeftWin", "RightWin"];
+
+    /// <summary>
+    /// Builds the canonical text for keys pressed together, modifiers first ("RightCtrl+Space",
+    /// "Ctrl+Shift+F12"). Returns null if the combination has no key or only unknown keys.
+    /// </summary>
+    public static string? Format(IEnumerable<string> keyNames)
+    {
+        var known = keyNames.Where(NamedKeys.ContainsKey).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (known.Count == 0)
+        {
+            return null;
+        }
+
+        var modifiers = known.Where(k => ModifierOrder.Contains(k, StringComparer.OrdinalIgnoreCase))
+            .OrderBy(k => Array.FindIndex(ModifierOrder, m => string.Equals(m, k, StringComparison.OrdinalIgnoreCase)));
+        var others = known.Where(k => !ModifierOrder.Contains(k, StringComparer.OrdinalIgnoreCase));
+        return string.Join('+', modifiers.Concat(others));
+    }
+
+    /// <summary>True if both gestures accept exactly the same key combinations.</summary>
+    public bool IsEquivalentTo(HotkeyGesture other) =>
+        Parts.Count == other.Parts.Count
+        && Parts.All(part => other.Parts.Any(o => o.Order().SequenceEqual(part.Order())));
+
     public static HotkeyGesture Parse(string text)
     {
         if (!TryParse(text, out var gesture, out var error))

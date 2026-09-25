@@ -6,7 +6,10 @@ namespace TKVoice.Infrastructure.Logging;
 public sealed class FileLog(string directory, string minimumLevel) : ILog
 {
     private readonly Lock _gate = new();
-    private readonly int _minimum = Rank(minimumLevel);
+    private int _minimum = Rank(minimumLevel);
+
+    /// <summary>Debug, Info, Warn or Error; can be changed at runtime.</summary>
+    public void SetMinimumLevel(string level) => _minimum = Rank(level);
 
     public string Directory { get; } = directory;
 

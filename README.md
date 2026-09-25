@@ -11,13 +11,14 @@ Architekturentscheidungen: [docs/architecture.md](docs/architecture.md)
 - Phase 2 (Target Handling): Einfügen per Zwischenablage mit Wiederherstellung des vorherigen Inhalts, Fokus auf Ursprungsfenster und -feld.
 - Phase 3 (Flow Bar): schwebende Statusanzeige unten mittig mit Wellenform, Verarbeitung, Fehlern.
 - Start-/Stoppsignale.
+- Phase 9 (Einstellungen & Tray): Einstellungsfenster, Pausieren, Autostart, Hotkeys per Tastendruck.
 - Phase 8 (Zuverlässigkeit): automatische Wiederholung bei Netzwerk-/Serverfehlern ohne Diktatverlust, klare Fehlermeldungen, Mikrofonausfall.
 - Phase 7 (Hands-free): freihändige Aufnahme ohne Längenbegrenzung, optionales Stille-Ende.
 - Phase 6 (App-Regeln): Stil je Programm – Chat knapp, E-Mail ausformuliert, Entwicklung ohne Umformulierung.
 - Phase 5 (Wörterbuch): Begriffe verbessern Erkennung und Schreibweise; lernen per Markieren + Hotkey oder Buchstabieren.
 - Phase 4 (Smart Mode): Füllwörter, Selbstkorrekturen, Zahlen, Buchstabieren, Formatierungs- und Korrekturbefehle.
 
-Noch kein Einstellungsfenster (Konfiguration über `settings.json`).
+Offen: Kostenübersicht/Budget, Debug-Modus, Passwortfeld-Erkennung (Phase 10), Installer (Phase 11).
 
 ## Voraussetzungen
 
@@ -33,8 +34,8 @@ dotnet test TKVoice.slnx
 dotnet run --project src/TKVoice.App
 ```
 
-Beim ersten Start fragt TK Voice nach dem OpenAI API Key und speichert ihn im Windows Credential Manager
-(`TKVoice/OpenAI`). Später jederzeit über das Tray-Menü → „OpenAI API Key hinterlegen …“.
+Beim ersten Start öffnen sich die Einstellungen auf der Seite „OpenAI“; der API Key wird im Windows
+Credential Manager (`TKVoice/OpenAI`) gespeichert. Alle Einstellungen: Tray-Icon → „Einstellungen …“ oder Doppelklick.
 
 ## Bedienung
 
@@ -56,8 +57,5 @@ Beim ersten Start fragt TK Voice nach dem OpenAI API Key und speichert ihn im Wi
 | Technische Logs (ohne Inhalte) | `%LOCALAPPDATA%\TK Voice\logs\` |
 | API Key | Windows Credential Manager, `TKVoice/OpenAI` |
 
-App-Regeln stehen unter `AppRules` in `settings.json`: Prozessname (steht im Log bei „Recording started … Target:“)
-plus Stilanweisung. Eine eigene Liste ersetzt die Standardregeln.
-
-Hotkeys werden in `settings.json` als Tastenkombination angegeben, z. B. `"RightCtrl"`, `"Ctrl+Win"`, `"Ctrl+Shift+F9"`.
-Änderungen werden nach einem Neustart von TK Voice wirksam.
+Alles ist im Einstellungsfenster änderbar und gilt sofort; `settings.json` kann weiterhin direkt bearbeitet werden
+(wirksam nach Neustart).

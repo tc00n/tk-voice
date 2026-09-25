@@ -1,11 +1,10 @@
 using System.Diagnostics;
 using System.Drawing;
-using System.IO;
 using System.Drawing.Drawing2D;
-using System.Windows;
+using System.IO;
 using System.Windows.Forms;
+using TKVoice.App.Settings;
 using TKVoice.Core.Abstractions;
-using TKVoice.Core.Dictionary;
 using TKVoice.Core.Processing;
 using TKVoice.Infrastructure;
 using Application = System.Windows.Application;
@@ -13,39 +12,44 @@ using Application = System.Windows.Application;
 namespace TKVoice.App;
 
 /// <summary>
-/// System tray presence (FR-043, minimal for now). Until the Flow Bar exists, the icon color is the
-/// visible recording indicator required by §47.
+/// System tray presence (FR-043): activate/pause, open settings, show and switch Smart/Raw, quit.
+/// The icon color also mirrors the dictation state (blue ready, red recording, orange processing,
+/// grey paused).
 /// </summary>
 internal sealed class TrayIcon : IUserNotifier, IDisposable
 {
-    private readonly ICredentialService _credentials;
-    private readonly ILog _log;
     private readonly NotifyIcon _notifyIcon;
     private readonly Dictionary<DictationState, Icon> _icons;
+    private readonly Icon _pausedIcon;
+    private readonly ToolStripMenuItem _activeItem;
     private readonly ToolStripMenuItem _smartModeItem;
+    private DictationState _state = DictationState.Idle;
+    private bool _active = true;
 
-    public TrayIcon(ICredentialService credentials, ProcessingModeState mode, Action toggleMode, PersonalDictionary dictionary, ILog log)
+    public TrayIcon(ProcessingModeState mode, ILog log)
     {
-        _credentials = credentials;
-        _log = log;
         _icons = new Dictionary<DictationState, Icon>
         {
             [DictationState.Idle] = CreateIcon(Color.FromArgb(0x33, 0x66, 0xCC)),
             [DictationState.Recording] = CreateIcon(Color.FromArgb(0xD9, 0x30, 0x25)),
             [DictationState.Processing] = CreateIcon(Color.FromArgb(0xE8, 0xA3, 0x17)),
         };
+        _pausedIcon = CreateIcon(Color.FromArgb(0x8A, 0x8A, 0x8A));
 
         var menu = new ContextMenuStrip();
-        _smartModeItem = new ToolStripMenuItem("Smart Mode (aus = Raw Mode)", null, (_, _) => toggleMode())
+        _activeItem = new ToolStripMenuItem("TK Voice aktiv", null, (_, _) => App.Current.SetActive(!_active));
+        _smartModeItem = new ToolStripMenuItem("Smart Mode (aus = Raw Mode)", null, (_, _) => App.Current.ToggleMode())
         {
             Checked = mode.Current == ProcessingMode.Smart,
         };
         mode.Changed += (_, current) => OnUiThread(() => _smartModeItem.Checked = current == ProcessingMode.Smart);
+
+        menu.Items.Add(_activeItem);
         menu.Items.Add(_smartModeItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Wörterbuch …", null, (_, _) => DictionaryWindow.ShowSingle(dictionary));
-        menu.Items.Add("OpenAI API Key hinterlegen …", null, (_, _) => PromptForApiKey());
-        menu.Items.Add("Logs öffnen", null, (_, _) => OpenLogs());
+        menu.Items.Add("Einstellungen …", null, (_, _) => App.Current.OpenSettings());
+        menu.Items.Add("Wörterbuch …", null, (_, _) => App.Current.OpenSettings(SettingsPage.Dictionary));
+        menu.Items.Add("Logs öffnen", null, (_, _) => OpenLogs(log));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Beenden", null, (_, _) => Application.Current.Shutdown());
 
@@ -56,41 +60,25 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
             ContextMenuStrip = menu,
             Visible = true,
         };
+        _notifyIcon.DoubleClick += (_, _) => App.Current.OpenSettings();
     }
 
     public void SetState(DictationState state) => OnUiThread(() =>
     {
-        _notifyIcon.Icon = _icons[state];
-        _notifyIcon.Text = state switch
-        {
-            DictationState.Recording => "TK Voice – Aufnahme",
-            DictationState.Processing => "TK Voice – Verarbeitung",
-            _ => "TK Voice",
-        };
+        _state = state;
+        UpdateIcon();
+    });
+
+    public void SetActive(bool active) => OnUiThread(() =>
+    {
+        _active = active;
+        _activeItem.Checked = active;
+        UpdateIcon();
     });
 
     public void ShowError(string message) => OnUiThread(() => _notifyIcon.ShowBalloonTip(5000, "TK Voice", message, ToolTipIcon.Warning));
 
     public void ShowInfo(string message) => OnUiThread(() => _notifyIcon.ShowBalloonTip(3000, "TK Voice", message, ToolTipIcon.Info));
-
-    public void PromptForApiKey() => OnUiThread(() =>
-    {
-        var dialog = new ApiKeyWindow();
-        if (dialog.ShowDialog() == true)
-        {
-            try
-            {
-                _credentials.SetOpenAIApiKey(dialog.ApiKey);
-                _log.Info("OpenAI API key stored in Windows Credential Manager.");
-                ShowInfo("API Key gespeichert.");
-            }
-            catch (Exception ex)
-            {
-                _log.Error("Storing API key failed.", ex);
-                ShowError(ex.Message);
-            }
-        }
-    });
 
     public void Dispose()
     {
@@ -100,12 +88,39 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
         {
             icon.Dispose();
         }
+
+        _pausedIcon.Dispose();
     }
 
-    private static void OpenLogs()
+    private void UpdateIcon()
     {
-        Directory.CreateDirectory(AppPaths.LogDirectory);
-        Process.Start(new ProcessStartInfo(AppPaths.LogDirectory) { UseShellExecute = true });
+        if (!_active && _state == DictationState.Idle)
+        {
+            _notifyIcon.Icon = _pausedIcon;
+            _notifyIcon.Text = "TK Voice – pausiert";
+            return;
+        }
+
+        _notifyIcon.Icon = _icons[_state];
+        _notifyIcon.Text = _state switch
+        {
+            DictationState.Recording => "TK Voice – Aufnahme",
+            DictationState.Processing => "TK Voice – Verarbeitung",
+            _ => "TK Voice",
+        };
+    }
+
+    internal static void OpenLogs(ILog log)
+    {
+        try
+        {
+            Directory.CreateDirectory(AppPaths.LogDirectory);
+            Process.Start(new ProcessStartInfo(AppPaths.LogDirectory) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            log.Error("Opening the log folder failed.", ex);
+        }
     }
 
     private static void OnUiThread(Action action)

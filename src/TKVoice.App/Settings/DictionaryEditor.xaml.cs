@@ -1,46 +1,58 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using TKVoice.Core.Dictionary;
 
-namespace TKVoice.App;
+namespace TKVoice.App.Settings;
 
-/// <summary>View, add, edit and delete personal dictionary entries (Phase 5; later part of Settings).</summary>
-public partial class DictionaryWindow : Window
+/// <summary>View, add, edit and delete personal dictionary entries. Changes are saved immediately.</summary>
+public partial class DictionaryEditor : UserControl
 {
-    private static DictionaryWindow? _open;
-
-    private readonly PersonalDictionary _dictionary;
+    private PersonalDictionary? _dictionary;
     private string? _editing;
 
-    private DictionaryWindow(PersonalDictionary dictionary)
+    public DictionaryEditor()
     {
         InitializeComponent();
-        _dictionary = dictionary;
-        _dictionary.Changed += OnDictionaryChanged;
-        Closed += (_, _) =>
+
+        // Tab switches unload and reload the page; subscribe only while it is shown.
+        Loaded += (_, _) =>
         {
-            _dictionary.Changed -= OnDictionaryChanged;
-            _open = null;
+            if (_dictionary is not null)
+            {
+                _dictionary.Changed += OnDictionaryChanged;
+                Refresh();
+            }
         };
-        Loaded += (_, _) => TermBox.Focus();
-        Refresh();
+        Unloaded += (_, _) =>
+        {
+            if (_dictionary is not null)
+            {
+                _dictionary.Changed -= OnDictionaryChanged;
+            }
+        };
     }
 
-    public static void ShowSingle(PersonalDictionary dictionary)
-    {
-        _open ??= new DictionaryWindow(dictionary);
-        _open.Show();
-        _open.Activate();
-    }
+    internal void Bind(PersonalDictionary dictionary) => _dictionary = dictionary;
 
     private void OnDictionaryChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Refresh);
 
     private void Refresh()
     {
         var selected = TermList.SelectedItem as string;
-        var terms = _dictionary.Terms.OrderBy(t => t, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var terms = _dictionary!.Terms.OrderBy(t => t, StringComparer.CurrentCultureIgnoreCase).ToList();
         TermList.ItemsSource = terms;
         TermList.SelectedItem = selected is not null && terms.Contains(selected) ? selected : null;
         CountText.Text = terms.Count == 1 ? "1 Eintrag" : $"{terms.Count} Einträge";
+    }
+
+    private void OnTermBoxKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            OnSave(sender, e);
+            e.Handled = true;
+        }
     }
 
     private void OnSave(object sender, RoutedEventArgs e)
@@ -51,7 +63,7 @@ public partial class DictionaryWindow : Window
             return;
         }
 
-        var saved = _editing is null ? _dictionary.Add(term) : _dictionary.Update(_editing, term);
+        var saved = _editing is null ? _dictionary!.Add(term) : _dictionary!.Update(_editing, term);
         if (!saved)
         {
             ShowError($"„{term}“ ist bereits im Wörterbuch.");
@@ -85,7 +97,7 @@ public partial class DictionaryWindow : Window
     {
         if (TermList.SelectedItem is string term)
         {
-            _dictionary.Remove(term);
+            _dictionary!.Remove(term);
             if (_editing == term)
             {
                 EndEdit();
@@ -93,7 +105,7 @@ public partial class DictionaryWindow : Window
         }
     }
 
-    private void OnSelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+    private void OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         var hasSelection = TermList.SelectedItem is not null;
         EditButton.IsEnabled = hasSelection;

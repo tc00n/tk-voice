@@ -1,0 +1,40 @@
+<UserControl x:Class="TKVoice.App.Settings.DictionaryEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,12">
+            Namen, Firmen, Produkte, Abkürzungen und Fachbegriffe in der gewünschten Schreibweise. Sie verbessern
+            die Erkennung und werden so geschrieben. Neu lernen: Begriff markieren und den Wörterbuch-Hotkey drücken,
+            oder beim Diktieren buchstabieren („NEONEX, geschrieben N-E-O-N-E-X“). Änderungen gelten sofort.
+        </TextBlock>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="TermBox" KeyDown="OnTermBoxKeyDown" />
+            <Button x:Name="SaveButton" Grid.Column="1" Content="Hinzufügen" Margin="8,0,0,0" Click="OnSave" />
+            <Button x:Name="CancelEditButton" Grid.Column="2" Content="Abbrechen" Margin="8,0,0,0" Visibility="Collapsed" Click="OnCancelEdit" />
+        </Grid>
+
+        <TextBlock x:Name="ErrorText" Grid.Row="2" Style="{StaticResource Error}" Visibility="Collapsed" />
+
+        <ListBox x:Name="TermList" Grid.Row="3" Margin="0,12,0,0" MouseDoubleClick="OnEdit" SelectionChanged="OnSelectionChanged" />
+
+        <DockPanel Grid.Row="4" Margin="0,12,0,0" LastChildFill="False">
+            <TextBlock x:Name="CountText" VerticalAlignment="Center" Style="{StaticResource Hint}" />
+            <Button x:Name="DeleteButton" DockPanel.Dock="Right" Content="Löschen" Margin="8,0,0,0" IsEnabled="False" Click="OnDelete" />
+            <Button x:Name="EditButton" DockPanel.Dock="Right" Content="Bearbeiten" IsEnabled="False" Click="OnEdit" />
+        </DockPanel>
+    </Grid>
+</UserControl>
