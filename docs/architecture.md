@@ -129,7 +129,8 @@ Audiodateien. Abspielen über NAudio `WaveOut`, nicht blockierend. `Audio.Sounds
   Das Transkript ist diktierter Inhalt, keine Anweisung – Fragen werden eingefügt, nicht beantwortet.
 - Kontext ausschließlich: Prozessname, optional Fenstertitel (standardmäßig **aus**, Titel können
   Betreffzeilen enthalten), später Wörterbuch (§42).
-- **Überspringen:** Kurze Transkripte (≤ 20 Wörter) ohne Füllwörter, Korrekturen, Befehle, Buchstabieren,
+- **Überspringen:** Kurze Transkripte (≤ 20 Wörter), bereits korrekt interpunktiert (Großschreibung am Anfang,
+  Satzzeichen am Ende, Komma vor „dass/weil/wenn …“), ohne Füllwörter, Korrekturen, Befehle, Buchstabieren,
   Zahlwörter und Wiederholungen gehen ohne Modellaufruf durch (`SmartSkipHeuristic`, bewusst konservativ).
 - **Output-Guard:** Codefences werden entfernt; eine Ausgabe, die deutlich länger ist als das Transkript
   (> 1,3× + 40 Zeichen), gilt als Antwort statt Bereinigung → Rohtext.

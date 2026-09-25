@@ -141,7 +141,7 @@ public class DictationControllerTests
     public async Task Push_to_talk_records_transcribes_and_inserts_into_captured_target()
     {
         var controller = CreateController();
-        _transcription.Result = "Hallo Welt";
+        _transcription.Result = "Hallo Welt.";
 
         controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
         Assert.Equal(DictationState.Recording, controller.State);
@@ -153,7 +153,7 @@ public class DictationControllerTests
 
         await controller.ProcessingCompletion;
 
-        Assert.Equal([(Notepad, "Hallo Welt")], _insertion.Inserted);
+        Assert.Equal([(Notepad, "Hallo Welt.")], _insertion.Inserted);
         Assert.Equal(OneSecondOfAudio.Length, _transcription.Session!.AppendedBytes);
         Assert.True(_transcription.Session.Disposed);
         Assert.Equal([DictationState.Recording, DictationState.Processing, DictationState.Idle], _notifier.States);
@@ -165,7 +165,7 @@ public class DictationControllerTests
     public async Task Target_stays_the_one_captured_at_start()
     {
         var controller = CreateController();
-        _transcription.Result = "Text";
+        _transcription.Result = "Text.";
 
         controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
         _targetCapture.Target = new DictationTarget(0x9999, 7, "chrome");
@@ -196,7 +196,7 @@ public class DictationControllerTests
     public async Task Unavailable_target_informs_user()
     {
         var controller = CreateController();
-        _transcription.Result = "Text";
+        _transcription.Result = "Text.";
         _insertion.Result = InsertionResult.TargetUnavailable;
 
         controller.OnHotkeyPressed(HotkeyAction.PushToTalk);

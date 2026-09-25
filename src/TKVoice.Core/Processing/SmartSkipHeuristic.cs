@@ -52,6 +52,11 @@ public static partial class SmartSkipHeuristic
             return false;
         }
 
+        if (!LooksPunctuated(transcript))
+        {
+            return false;
+        }
+
         // Immediate repetitions ("das das") and spelled-out letters ("N-E-O", "N E O N").
         for (var i = 1; i < words.Count; i++)
         {
@@ -64,8 +69,24 @@ public static partial class SmartSkipHeuristic
         return !SpelledLettersPattern().IsMatch(transcript);
     }
 
+    /// <summary>
+    /// Skipping relies on the transcription's punctuation. Require a capitalized start, closing
+    /// punctuation and a comma before German subordinating conjunctions (mandatory by German rules).
+    /// </summary>
+    private static bool LooksPunctuated(string transcript)
+    {
+        var text = transcript.Trim();
+        return text.Length > 0
+            && !char.IsLower(text[0])
+            && ".?!".Contains(text[^1])
+            && !ConjunctionWithoutCommaPattern().IsMatch(text);
+    }
+
     private static bool IsNumberWord(string word) =>
         NumberWordPattern().IsMatch(word);
+
+    [GeneratedRegex(@"[\p{L}\p{N}]\s+(dass|weil|obwohl|damit|sodass|nachdem|bevor|während|falls|sobald|wenn|ob|sondern)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex ConjunctionWithoutCommaPattern();
 
     [GeneratedRegex(@"[\p{L}\p{N}]+")]
     private static partial Regex WordPattern();

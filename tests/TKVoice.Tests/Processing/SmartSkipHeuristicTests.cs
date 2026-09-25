@@ -10,6 +10,7 @@ public class SmartSkipHeuristicTests
     [InlineData("Kannst du mir den Bericht schicken?")]
     [InlineData("Sounds good, see you tomorrow.")]
     [InlineData("Das Fenster ist offen.")]
+    [InlineData("Ich glaube, dass wir das schaffen, weil das Team gut ist.")]
     public void Clean_short_text_can_skip(string transcript)
     {
         Assert.True(SmartSkipHeuristic.CanSkip(transcript));
@@ -26,6 +27,9 @@ public class SmartSkipHeuristicTests
     [InlineData("Mach daraus drei Bulletpoints.")] // structure command + number
     [InlineData("Das das ist gut.")] // repetition
     [InlineData("Wir haben dreitausendzweihundert Euro ausgegeben.")] // compound number
+    [InlineData("Ich glaube dass wir das schaffen.")] // missing comma before subordinate clause
+    [InlineData("ich bin gleich da.")] // lowercase start
+    [InlineData("Ich bin gleich da")] // no closing punctuation
     [InlineData("")]
     public void Text_that_needs_cleanup_is_not_skipped(string transcript)
     {
