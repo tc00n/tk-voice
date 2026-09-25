@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/TKVoice.App/TKVoice.App.csproj" />
+    <Project Path="src/TKVoice.Core/TKVoice.Core.csproj" />
+    <Project Path="src/TKVoice.Infrastructure/TKVoice.Infrastructure.csproj" />
+    <Project Path="src/TKVoice.OpenAI/TKVoice.OpenAI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/TKVoice.Tests/TKVoice.Tests.csproj" />
+  </Folder>
+</Solution>

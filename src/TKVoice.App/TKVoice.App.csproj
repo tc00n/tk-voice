@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>TKVoice</AssemblyName>
+    <RootNamespace>TKVoice.App</RootNamespace>
+    <AssemblyTitle>TK Voice</AssemblyTitle>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF and WinForms both define Application, MessageBox etc.; WinForms is only used for the tray icon. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TKVoice.Core\TKVoice.Core.csproj" />
+    <ProjectReference Include="..\TKVoice.OpenAI\TKVoice.OpenAI.csproj" />
+    <ProjectReference Include="..\TKVoice.Infrastructure\TKVoice.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

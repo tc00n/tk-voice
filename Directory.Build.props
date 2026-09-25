@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Company>TK Voice</Company>
+    <Product>TK Voice</Product>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+</Project>
