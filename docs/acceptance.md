@@ -17,3 +17,5 @@
 | AC-13 | Hands-free ohne Zeitlimit | Segmente je eigene Session, kein Limit | Unit-Tests, TTS-API-Test, manuell |
 | AC-14 | Passwortfeld blockiert | UI Automation `IsPassword` vor Aufnahme und Einfügen | Test mit echtem Passwortfeld, Unit-Tests |
 | AC-15 | API Key nicht im Klartext | Windows Credential Manager, nie in Logs | Unit-Test (keine Key-Felder in `settings.json`), Code-Review |
+
+Installer (NFR-008): Installation, Start über das Startmenü und Diktat manuell bestätigt (25.09.2026).
