@@ -43,6 +43,7 @@ public sealed class DictationController
         TKVoiceSettings settings)
     {
         _audio = audio;
+        _audio.Failed += OnMicrophoneFailed;
         _transcription = transcription;
         _smartProcessor = smartProcessor;
         _mode = mode;
@@ -217,6 +218,33 @@ public sealed class DictationController
         _notifier.SetHandsFree(handsFree);
     }
 
+    /// <summary>
+    /// Safety net above the per-attempt timeouts and retries of the services (FR-036), so a hung
+    /// request can never block TK Voice: every attempt plus backoff, plus a margin.
+    /// </summary>
+    private TimeSpan OverallTimeout(int attemptTimeoutSeconds) =>
+        TimeSpan.FromSeconds(attemptTimeoutSeconds * (_settings.Processing.MaxRetries + 1) + 15);
+
+    /// <summary>
+    /// The microphone disappeared mid-recording: keep what was said so far and process it, so the
+    /// dictation is not lost. Raised on a capture thread, hence the hand-off.
+    /// </summary>
+    private void OnMicrophoneFailed(object? sender, Exception exception)
+    {
+        ActiveDictation? dictation;
+        lock (_gate)
+        {
+            dictation = _current;
+        }
+
+        _log.Error("Microphone failed during recording.", exception);
+        _notifier.ShowError("Mikrofon getrennt – das bisher Gesagte wird verarbeitet.");
+        if (dictation is not null)
+        {
+            _ = Task.Run(() => StopRecording(dictation));
+        }
+    }
+
     /// <summary>Raised on the audio thread, which must not wait for itself to stop.</summary>
     private void OnSilenceTimeout(ActiveDictation dictation)
     {
@@ -257,7 +285,7 @@ public sealed class DictationController
                 return;
             }
 
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.Processing.TimeoutSeconds));
+            using var timeout = new CancellationTokenSource(OverallTimeout(_settings.Processing.TimeoutSeconds));
             var transcript = (await dictation.Session.CompleteAsync(timeout.Token)).Trim();
             _log.Info($"Final transcript after {(DateTimeOffset.UtcNow - stopped).TotalMilliseconds:F0} ms ({transcript.Length} chars).");
 
@@ -285,7 +313,7 @@ public sealed class DictationController
         }
         catch (OperationCanceledException)
         {
-            _log.Warn($"Processing timed out after {_settings.Processing.TimeoutSeconds} s.");
+            _log.Warn("Processing hit the overall safety timeout.");
             _notifier.ShowError("Die Verarbeitung hat zu lange gedauert und wurde abgebrochen.");
         }
         catch (Exception ex)
@@ -326,7 +354,7 @@ public sealed class DictationController
         var started = DateTimeOffset.UtcNow;
         try
         {
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(_settings.Processing.SmartTimeoutSeconds));
+            using var timeout = new CancellationTokenSource(OverallTimeout(_settings.Processing.SmartTimeoutSeconds));
             var rule = AppRule.Find(_settings.AppRules, dictation.Target.ProcessName);
             var request = new TextProcessingRequest(
                 transcript,

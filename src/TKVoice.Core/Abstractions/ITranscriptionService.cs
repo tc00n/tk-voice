@@ -24,4 +24,8 @@ public interface ITranscriptionSession : IAsyncDisposable
     Task<string> CompleteAsync(CancellationToken cancellationToken);
 }
 
-public sealed class TranscriptionException(string message, Exception? inner = null) : Exception(message, inner);
+/// <param name="isTransient">Network problems, timeouts, rate limits and server errors; worth retrying (FR-035).</param>
+public sealed class TranscriptionException(string message, bool isTransient = false, Exception? inner = null) : Exception(message, inner)
+{
+    public bool IsTransient { get; } = isTransient;
+}

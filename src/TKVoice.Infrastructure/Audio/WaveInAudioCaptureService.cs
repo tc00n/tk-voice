@@ -6,14 +6,23 @@ namespace TKVoice.Infrastructure.Audio;
 /// <summary>
 /// Microphone capture via WinMM (NAudio WaveIn). Windows resamples to the requested
 /// 24 kHz 16-bit mono format. The device is opened per dictation and closed right after (§47).
+/// A watchdog reports a failure when no audio arrives for a while, since some devices simply go
+/// silent instead of raising an error when they are unplugged.
 /// </summary>
 public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAudioCaptureService
 {
     private const int BufferMilliseconds = 50;
+    private static readonly TimeSpan NoDataTimeout = TimeSpan.FromSeconds(2);
 
     private WaveIn? _waveIn;
     private Action<ReadOnlyMemory<byte>>? _onChunk;
     private ManualResetEventSlim? _stopped;
+    private Timer? _watchdog;
+    private long _lastDataTicks;
+    private volatile bool _stopping;
+    private int _failureRaised;
+
+    public event EventHandler<Exception>? Failed;
 
     public void Start(Action<ReadOnlyMemory<byte>> onChunk)
     {
@@ -24,6 +33,8 @@ public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAud
 
         _onChunk = onChunk;
         _stopped = new ManualResetEventSlim();
+        _stopping = false;
+        _failureRaised = 0;
         _waveIn = new WaveIn
         {
             DeviceNumber = deviceNumber,
@@ -38,11 +49,18 @@ public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAud
         {
             _waveIn.StartRecording();
         }
-        catch
+        catch (Exception ex)
         {
             Cleanup();
-            throw;
+            throw new InvalidOperationException(
+                deviceNumber < 0
+                    ? "Kein Mikrofon verfügbar. Bitte ein Aufnahmegerät anschließen oder in Windows als Standard festlegen."
+                    : $"Das Mikrofon (Gerät {deviceNumber}) ist nicht verfügbar.",
+                ex);
         }
+
+        Interlocked.Exchange(ref _lastDataTicks, Environment.TickCount64);
+        _watchdog = new Timer(_ => CheckForData(), null, NoDataTimeout, TimeSpan.FromMilliseconds(500));
 
         log.Debug($"Microphone opened (device {deviceNumber}).");
     }
@@ -54,6 +72,9 @@ public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAud
             return;
         }
 
+        _stopping = true;
+        _watchdog?.Dispose();
+        _watchdog = null;
         _waveIn.StopRecording();
 
         // StopRecording returns before the final buffers are flushed; wait so the last words are not lost.
@@ -70,6 +91,7 @@ public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAud
     {
         if (e.BytesRecorded > 0)
         {
+            Interlocked.Exchange(ref _lastDataTicks, Environment.TickCount64);
             // The buffer is reused by NAudio, so hand out a copy.
             _onChunk?.Invoke(e.Buffer.AsSpan(0, e.BytesRecorded).ToArray());
         }
@@ -77,12 +99,33 @@ public sealed class WaveInAudioCaptureService(int deviceNumber, ILog log) : IAud
 
     private void OnRecordingStopped(object? sender, StoppedEventArgs e)
     {
+        _stopped?.Set();
         if (e.Exception is not null)
         {
             log.Error("Microphone stopped with an error.", e.Exception);
+            RaiseFailed(e.Exception);
         }
+        else if (!_stopping)
+        {
+            RaiseFailed(new InvalidOperationException("Recording stopped unexpectedly."));
+        }
+    }
 
-        _stopped?.Set();
+    private void CheckForData()
+    {
+        var silentFor = TimeSpan.FromMilliseconds(Environment.TickCount64 - Interlocked.Read(ref _lastDataTicks));
+        if (!_stopping && silentFor >= NoDataTimeout)
+        {
+            RaiseFailed(new TimeoutException($"No audio data for {silentFor.TotalSeconds:F1} s."));
+        }
+    }
+
+    private void RaiseFailed(Exception exception)
+    {
+        if (Interlocked.Exchange(ref _failureRaised, 1) == 0)
+        {
+            Failed?.Invoke(this, exception);
+        }
     }
 
     private void Cleanup()

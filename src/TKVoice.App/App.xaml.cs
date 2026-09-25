@@ -61,13 +61,14 @@ public partial class App : Application
         var notifier = new CompositeNotifier(_tray, new FlowBarOverlay(new FlowBarWindow()));
 
         _clipboard = new Win32ClipboardService(SynchronizationContext.Current!, _log);
-        _smartProcessor = new OpenAISmartTextProcessor(settings.OpenAI, credentials, () => dictionary.Terms, _log);
+        _smartProcessor = new OpenAISmartTextProcessor(settings.OpenAI, settings.Processing, credentials, () => dictionary.Terms, _log);
         var addToDictionary = new AddToDictionaryCommand(new ClipboardSelectionReader(_clipboard, _log), dictionary, notifier, _log);
 
         controller = new DictationController(
             new WaveInAudioCaptureService(settings.Audio.InputDeviceNumber, _log),
             new RealtimeTranscriptionService(
                 settings.OpenAI,
+                settings.Processing,
                 credentials,
                 () => dictionary.Terms.TakeLast(settings.Dictionary.MaxTranscriptionKeywords).ToList(),
                 _log),

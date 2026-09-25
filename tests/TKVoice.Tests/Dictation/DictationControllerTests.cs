@@ -299,6 +299,22 @@ public class DictationControllerTests : IDisposable
     }
 
     [Fact]
+    public async Task Microphone_failure_processes_what_was_said_so_far()
+    {
+        var controller = CreateController();
+        _transcription.Result = "Bis hierhin.";
+
+        controller.OnHotkeyPressed(HotkeyAction.PushToTalk);
+        _audio.Emit(OneSecondOfAudio);
+        _audio.Fail();
+
+        await WaitUntilAsync(() => controller.State != DictationState.Recording);
+        await controller.ProcessingCompletion;
+        Assert.Equal("Bis hierhin.", _insertion.Inserted.Single().Text);
+        Assert.Contains(_notifier.Errors, e => e.Contains("Mikrofon"));
+    }
+
+    [Fact]
     public void Toggle_hotkey_switches_mode_and_informs_user()
     {
         var controller = CreateController();
@@ -426,6 +442,10 @@ public class DictationControllerTests : IDisposable
         private Action<ReadOnlyMemory<byte>>? _onChunk;
 
         public bool IsRunning => _onChunk is not null;
+
+        public event EventHandler<Exception>? Failed;
+
+        public void Fail() => Failed?.Invoke(this, new InvalidOperationException("unplugged"));
 
         public void Start(Action<ReadOnlyMemory<byte>> onChunk) => _onChunk = onChunk;
 

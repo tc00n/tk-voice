@@ -8,30 +8,41 @@ namespace TKVoice.OpenAI;
 public sealed class RealtimeTranscriptionService : ITranscriptionService
 {
     private readonly OpenAISettings _settings;
+    private readonly ProcessingSettings _processing;
     private readonly ICredentialService _credentials;
     private readonly Func<IReadOnlyList<string>> _keywords;
     private readonly ILog _log;
     private readonly Func<string, IRealtimeTransport> _transportFactory;
 
     /// <param name="keywords">Personal vocabulary sent as recognition hints (FR-019).</param>
-    public RealtimeTranscriptionService(OpenAISettings settings, ICredentialService credentials, Func<IReadOnlyList<string>> keywords, ILog log)
-        : this(settings, credentials, keywords, log, apiKey => new WebSocketRealtimeTransport(new Uri(settings.RealtimeUrl), apiKey))
+    public RealtimeTranscriptionService(
+        OpenAISettings settings,
+        ProcessingSettings processing,
+        ICredentialService credentials,
+        Func<IReadOnlyList<string>> keywords,
+        ILog log)
+        : this(settings, processing, credentials, keywords, log, apiKey => new WebSocketRealtimeTransport(new Uri(settings.RealtimeUrl), apiKey))
     {
     }
 
     internal RealtimeTranscriptionService(
         OpenAISettings settings,
+        ProcessingSettings processing,
         ICredentialService credentials,
         Func<IReadOnlyList<string>> keywords,
         ILog log,
         Func<string, IRealtimeTransport> transportFactory)
     {
         _settings = settings;
+        _processing = processing;
         _credentials = credentials;
         _keywords = keywords;
         _log = log;
         _transportFactory = transportFactory;
     }
+
+    /// <summary>Realtime sessions end after 60 minutes; a segment without any pause is split before that.</summary>
+    private static readonly TimeSpan MaxSegmentDuration = TimeSpan.FromMinutes(55);
 
     public ITranscriptionSession StartSession()
     {
@@ -48,7 +59,7 @@ public sealed class RealtimeTranscriptionService : ITranscriptionService
             Keywords: _keywords(),
             Prompt: null);
 
-        return new RotatingTranscriptionSession(
+        return new SegmentedTranscriptionSession(
             () =>
             {
                 var session = new RealtimeTranscriptionSession(
@@ -61,8 +72,9 @@ public sealed class RealtimeTranscriptionService : ITranscriptionService
                 _log.Debug($"Transcription session started with model {_settings.TranscriptionModel}.");
                 return session;
             },
-            TimeSpan.FromMinutes(_settings.SessionRotationMinutes),
-            TimeSpan.FromMinutes(_settings.SessionRotationMinutes + 5),
+            _processing.MaxRetries,
+            TimeSpan.FromSeconds(_processing.TimeoutSeconds),
+            MaxSegmentDuration,
             _log);
     }
 }

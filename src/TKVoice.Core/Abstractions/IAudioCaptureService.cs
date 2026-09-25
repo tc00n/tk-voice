@@ -11,6 +11,12 @@ public interface IAudioCaptureService
 
     /// <summary>Stops capturing and releases the microphone. Returns once no further chunks will be delivered.</summary>
     void Stop();
+
+    /// <summary>
+    /// Raised on a capture thread when recording ends unexpectedly, e.g. the microphone was unplugged.
+    /// Handlers must not call <see cref="Stop"/> synchronously.
+    /// </summary>
+    event EventHandler<Exception>? Failed;
 }
 
 public static class AudioFormat

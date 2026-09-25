@@ -64,13 +64,19 @@ public sealed class AudioSettings
 
 public sealed class ProcessingSettings
 {
-    /// <summary>Maximum time from end of recording until the final transcript must be available.</summary>
+    /// <summary>
+    /// Timeout per attempt for OpenAI transcription results after the audio of a segment has ended
+    /// (FR-036). Each failed attempt is retried up to <see cref="MaxRetries"/> times.
+    /// </summary>
     public int TimeoutSeconds { get; set; } = 20;
+
+    /// <summary>Automatic retries after transient errors (network, timeout, rate limit, server error), FR-035.</summary>
+    public int MaxRetries { get; set; } = 2;
 
     /// <summary>"Smart" or "Raw"; the mode TK Voice starts in.</summary>
     public string DefaultMode { get; set; } = "Smart";
 
-    /// <summary>Maximum time for the smart processing request; on failure the raw transcript is inserted.</summary>
+    /// <summary>Timeout per smart processing attempt; after all retries fail the raw transcript is inserted.</summary>
     public int SmartTimeoutSeconds { get; set; } = 8;
 
     /// <summary>Skip smart processing for short transcripts without fillers, corrections, commands or numbers.</summary>
@@ -119,12 +125,6 @@ public sealed class OpenAISettings
 
     /// <summary>Silence appended before the final commit so the last spoken word is not cut off.</summary>
     public int TrailingSilenceMilliseconds { get; set; } = 300;
-
-    /// <summary>
-    /// Realtime sessions end after 60 minutes. Longer dictations switch to a new session at the next
-    /// speech pause after this many minutes (at the latest 5 minutes later).
-    /// </summary>
-    public int SessionRotationMinutes { get; set; } = 50;
 
     public string ResponsesUrl { get; set; } = "https://api.openai.com/v1/responses";
     public string SmartProcessingModel { get; set; } = "gpt-6-luna";

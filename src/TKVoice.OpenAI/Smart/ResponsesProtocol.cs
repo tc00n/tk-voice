@@ -76,18 +76,18 @@ internal static class ResponsesProtocol
         return new ResponsesResult(text.ToString(), GetString(root, "id"), inputTokens, outputTokens);
     }
 
-    public static string? ParseErrorMessage(string json)
+    public static (string? Code, string? Message) ParseError(string json)
     {
         try
         {
             using var document = JsonDocument.Parse(json);
             return document.RootElement.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.Object
-                ? GetString(error, "message")
-                : null;
+                ? (GetString(error, "code") ?? GetString(error, "type"), GetString(error, "message"))
+                : (null, null);
         }
         catch (JsonException)
         {
-            return null;
+            return (null, null);
         }
     }
 

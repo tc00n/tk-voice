@@ -3,27 +3,37 @@ using System.Net.Http.Headers;
 using System.Text;
 using TKVoice.Core.Abstractions;
 using TKVoice.Core.Processing;
+using TKVoice.Core.Reliability;
 using TKVoice.Core.Settings;
 
 namespace TKVoice.OpenAI.Smart;
 
-/// <summary>Smart processing via the OpenAI Responses API. Logs sizes, ids and latency, never text (NFR-006).</summary>
+/// <summary>
+/// Smart processing via the OpenAI Responses API, with a timeout per attempt and retries on
+/// transient errors (FR-035/036). Logs sizes, ids and latency, never text (NFR-006).
+/// </summary>
 public sealed class OpenAISmartTextProcessor : ISmartTextProcessor, IDisposable
 {
     private readonly OpenAISettings _settings;
+    private readonly ProcessingSettings _processing;
     private readonly ICredentialService _credentials;
     private readonly Func<IReadOnlyList<string>> _vocabulary;
     private readonly ILog _log;
     private readonly HttpClient _http;
+    private readonly Func<int, TimeSpan>? _backoff;
 
     public OpenAISmartTextProcessor(
         OpenAISettings settings,
+        ProcessingSettings processing,
         ICredentialService credentials,
         Func<IReadOnlyList<string>> vocabulary,
         ILog log,
-        HttpMessageHandler? handler = null)
+        HttpMessageHandler? handler = null,
+        Func<int, TimeSpan>? backoff = null)
     {
         _settings = settings;
+        _processing = processing;
+        _backoff = backoff;
         _credentials = credentials;
         _vocabulary = vocabulary;
         _log = log;
@@ -51,6 +61,26 @@ public sealed class OpenAISmartTextProcessor : ISmartTextProcessor, IDisposable
             SmartProcessingPrompt.BuildInput(request, _vocabulary()),
             MaxOutputTokensFor(request.Transcript));
 
+        try
+        {
+            return await Retry.RunAsync(
+                "Smart processing",
+                (_, token) => SendAsync(body, apiKey, token),
+                _processing.MaxRetries,
+                TimeSpan.FromSeconds(_processing.SmartTimeoutSeconds),
+                ex => ex is HttpRequestException or SmartProcessingException { IsTransient: true },
+                _log,
+                cancellationToken,
+                _backoff);
+        }
+        catch (Exception ex) when (ex is TimeoutException or HttpRequestException)
+        {
+            throw new SmartProcessingException("Smart Processing nicht erreichbar: " + ex.Message, isTransient: true, ex);
+        }
+    }
+
+    private async Task<string> SendAsync(string body, string apiKey, CancellationToken cancellationToken)
+    {
         using var message = new HttpRequestMessage(HttpMethod.Post, _settings.ResponsesUrl)
         {
             Content = new StringContent(body, Encoding.UTF8, "application/json"),
@@ -64,9 +94,11 @@ public sealed class OpenAISmartTextProcessor : ISmartTextProcessor, IDisposable
 
         if (!response.IsSuccessStatusCode)
         {
-            _log.Warn($"Smart processing HTTP {(int)response.StatusCode}, request {requestId}.");
+            var (code, apiMessage) = ResponsesProtocol.ParseError(json);
+            _log.Warn($"Smart processing HTTP {(int)response.StatusCode} ({code}), request {requestId}.");
             throw new SmartProcessingException(
-                $"OpenAI-Fehler {(int)response.StatusCode}: {ResponsesProtocol.ParseErrorMessage(json) ?? response.ReasonPhrase}");
+                OpenAIErrors.UserMessage(code, apiMessage, response.StatusCode),
+                OpenAIErrors.IsTransient(response.StatusCode) && code != "insufficient_quota");
         }
 
         var result = ResponsesProtocol.ParseResponse(json);

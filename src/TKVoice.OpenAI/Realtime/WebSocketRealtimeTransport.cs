@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
+using TKVoice.Core.Abstractions;
 
 namespace TKVoice.OpenAI.Realtime;
 
@@ -11,7 +12,17 @@ internal sealed class WebSocketRealtimeTransport(Uri uri, string apiKey) : IReal
     public async Task ConnectAsync(CancellationToken cancellationToken)
     {
         _socket.Options.SetRequestHeader("Authorization", "Bearer " + apiKey);
-        await _socket.ConnectAsync(uri, cancellationToken);
+        _socket.Options.CollectHttpResponseDetails = true;
+        try
+        {
+            await _socket.ConnectAsync(uri, cancellationToken);
+        }
+        catch (WebSocketException ex) when (_socket.HttpStatusCode != 0)
+        {
+            // The handshake was answered: e.g. 401 is a configuration problem, not a network one.
+            var status = _socket.HttpStatusCode;
+            throw new TranscriptionException(OpenAIErrors.UserMessage(null, null, status), OpenAIErrors.IsTransient(status), ex);
+        }
     }
 
     public Task SendAsync(string message, CancellationToken cancellationToken) =>

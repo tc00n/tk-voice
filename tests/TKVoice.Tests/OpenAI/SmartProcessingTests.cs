@@ -76,7 +76,7 @@ public class SmartProcessingTests
     {
         var handler = new RecordingHandler(HttpStatusCode.OK,
             """{"id":"r","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Ok."}]}]}""");
-        using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new FakeCredentials("sk-test"), () => [], new NullLog(), handler);
+        using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new ProcessingSettings(), new FakeCredentials("sk-test"), () => [], new NullLog(), handler);
 
         var output = await processor.ProcessAsync(new TextProcessingRequest("ok", "notepad"), CancellationToken.None);
 
@@ -88,23 +88,73 @@ public class SmartProcessingTests
     [Fact]
     public async Task Processor_surfaces_api_error_message()
     {
-        var handler = new RecordingHandler(HttpStatusCode.Unauthorized, """{"error":{"message":"Incorrect API key provided"}}""");
-        using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new FakeCredentials("sk-bad"), () => [], new NullLog(), handler);
+        var handler = new RecordingHandler(HttpStatusCode.Unauthorized, """{"error":{"code":"invalid_api_key","message":"Incorrect API key provided"}}""");
+        using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new ProcessingSettings(), new FakeCredentials("sk-bad"), () => [], new NullLog(), handler, _ => TimeSpan.Zero);
 
         var ex = await Assert.ThrowsAsync<SmartProcessingException>(() =>
             processor.ProcessAsync(new TextProcessingRequest("ok", "notepad"), CancellationToken.None));
-        Assert.Contains("401", ex.Message);
-        Assert.Contains("Incorrect API key", ex.Message);
+        Assert.Contains("API Key ungültig", ex.Message);
+        Assert.Equal(1, handler.Calls); // configuration errors are not retried
+    }
+
+    [Fact]
+    public async Task Transient_errors_are_retried_then_succeed()
+    {
+        var handler = new RecordingHandler(HttpStatusCode.OK,
+            """{"id":"r","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Ok."}]}]}""")
+        {
+            FailuresBeforeSuccess = [HttpStatusCode.ServiceUnavailable, HttpStatusCode.TooManyRequests],
+        };
+        using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new ProcessingSettings(), new FakeCredentials("sk"), () => [], new NullLog(), handler, _ => TimeSpan.Zero);
+
+        Assert.Equal("Ok.", await processor.ProcessAsync(new TextProcessingRequest("ok", "notepad"), CancellationToken.None));
+        Assert.Equal(3, handler.Calls);
+    }
+
+    [Fact]
+    public async Task Gives_up_after_max_retries()
+    {
+        var handler = new RecordingHandler(HttpStatusCode.BadGateway, "{}");
+        using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new ProcessingSettings { MaxRetries = 2 }, new FakeCredentials("sk"), () => [], new NullLog(), handler, _ => TimeSpan.Zero);
+
+        await Assert.ThrowsAsync<SmartProcessingException>(() =>
+            processor.ProcessAsync(new TextProcessingRequest("ok", "notepad"), CancellationToken.None));
+        Assert.Equal(3, handler.Calls);
+    }
+
+    [Fact]
+    public async Task Network_failure_is_retried()
+    {
+        var handler = new RecordingHandler(HttpStatusCode.OK,
+            """{"id":"r","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"Ok."}]}]}""")
+        {
+            ThrowNetworkErrors = 1,
+        };
+        using var processor = new OpenAISmartTextProcessor(new OpenAISettings(), new ProcessingSettings(), new FakeCredentials("sk"), () => [], new NullLog(), handler, _ => TimeSpan.Zero);
+
+        Assert.Equal("Ok.", await processor.ProcessAsync(new TextProcessingRequest("ok", "notepad"), CancellationToken.None));
+        Assert.Equal(2, handler.Calls);
     }
 
     private sealed class RecordingHandler(HttpStatusCode status, string body) : HttpMessageHandler
     {
         public HttpRequestMessage? Request { get; private set; }
+        public int Calls { get; private set; }
+        public List<HttpStatusCode> FailuresBeforeSuccess { get; init; } = [];
+        public int ThrowNetworkErrors { get; set; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Request = request;
-            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
+            Calls++;
+            if (ThrowNetworkErrors > 0)
+            {
+                ThrowNetworkErrors--;
+                throw new HttpRequestException("No such host is known.");
+            }
+
+            var responseStatus = Calls <= FailuresBeforeSuccess.Count ? FailuresBeforeSuccess[Calls - 1] : status;
+            return Task.FromResult(new HttpResponseMessage(responseStatus) { Content = new StringContent(body, Encoding.UTF8, "application/json") });
         }
     }
 

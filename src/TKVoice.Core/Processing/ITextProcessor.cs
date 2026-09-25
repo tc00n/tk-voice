@@ -21,4 +21,7 @@ public interface ISmartTextProcessor
     }
 }
 
-public sealed class SmartProcessingException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class SmartProcessingException(string message, bool isTransient = false, Exception? inner = null) : Exception(message, inner)
+{
+    public bool IsTransient { get; } = isTransient;
+}

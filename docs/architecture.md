@@ -188,11 +188,33 @@ bleiben Bezeichner erhalten („getUserById“, „README.md“), in Teams bleib
   Die Session zählt gesendete Commits vs. Bestätigungen (`committed`/`commit_empty`) und liefert das Ergebnis
   erst, wenn alle bestätigt und transkribiert sind.
 - **Speicher:** Audio wird nie gesammelt; Chunks gehen direkt in die WebSocket-Queue.
-- **Session-Limit (60 min):** `RotatingTranscriptionSession` wechselt nach 50 min an der nächsten Pause auf
-  eine neue Session, spätestens nach 55 min auch ohne Pause. Frühere Sessions werden im Hintergrund
-  abgeschlossen, der Text in Reihenfolge zusammengesetzt.
+- **Session-Limit (60 min):** abgelöst durch ADR-016 – jedes Segment hat eine eigene Session; ein Segment
+  ohne jede Pause wird nach 55 min zwangsweise geteilt.
 - **Stille-Ende (§46):** nur Hands-free, `Audio.HandsFreeSilenceTimeoutSeconds` (0 = aus, Standard, da die
   Spec es als aktivierbare Option beschreibt). Push-to-talk wird nie durch Stille beendet.
 
 Verifiziert mit synthetischer Sprache (Windows TTS, 19,6 s) gegen die API: 5 Segment-Commits während des
 Streamens, vollständiger Text in korrekter Reihenfolge, Ergebnis 0,7 s nach Stopp.
+
+## ADR-016 – Zuverlässigkeit: Retry, Timeouts, Fehlerbilder (Phase 8)
+
+- **Eine Realtime-Session pro Segment** (`SegmentedTranscriptionSession`). Das Audio eines Segments wird
+  gehalten, bis sein Transkript da ist. Scheitert die Session (Verbindungsabbruch, Timeout, Serverfehler),
+  wird das Segment in einer neuen Session aus dem gehaltenen Audio erneut transkribiert – bis zu
+  `Processing.MaxRetries` (2) Mal, Backoff 0,5 s / 2 s (FR-035). Danach wird das Audio sofort verworfen,
+  ebenso nach Erfolg (FR-037). Speicherbedarf: nur das aktuell offene Segment.
+  Ersetzt die Session-Rotation; die nächste Session wird beim Segmentwechsel geöffnet, während weitergesprochen wird.
+- **Timeouts (FR-036):** pro Versuch `Processing.TimeoutSeconds` (Transkript nach Segmentende) bzw.
+  `Processing.SmartTimeoutSeconds`; der Controller hat darüber nur noch ein Sicherheitsnetz
+  (alle Versuche + 15 s).
+- **Fehlerklassifikation:** vorübergehend = Netzwerk, Timeout, 408/409/429/5xx, `server_error`,
+  `rate_limit_exceeded` → Retry. Konfigurationsfehler (401 ungültiger Key, 403, 404 Modell, `insufficient_quota`)
+  → kein Retry, verständliche Meldung („OpenAI API Key ungültig …“). Der WebSocket-Handshake liefert dafür
+  den HTTP-Status (`CollectHttpResponseDetails`).
+- **Smart Processing** mit derselben Retry-Logik; scheitert es endgültig, wird der Rohtext eingefügt.
+- **Mikrofon:** Fehler-Event bei Abbruch; Watchdog meldet einen Ausfall, wenn 2 s lang keine Audiodaten
+  kommen (manche Geräte verstummen beim Abziehen nur). Das bis dahin Gesagte wird verarbeitet und eingefügt.
+  Startfehler mit klarer Meldung („Kein Mikrofon verfügbar …“).
+
+Verifiziert gegen die API: 19,6 s TTS-Sprache in 6 Sessions/Segmenten korrekt transkribiert; nicht
+erreichbarer Server → 3 Versuche mit Replay, klare Fehlermeldung nach 2,6 s.

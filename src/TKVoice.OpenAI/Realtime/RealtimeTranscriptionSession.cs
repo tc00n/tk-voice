@@ -149,9 +149,13 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         {
             // Disposed.
         }
+        catch (TranscriptionException ex)
+        {
+            Fail(ex);
+        }
         catch (Exception ex)
         {
-            Fail(new TranscriptionException("Verbindung zur OpenAI-Transkription fehlgeschlagen.", ex));
+            Fail(new TranscriptionException("Keine Verbindung zur OpenAI-Transkription.", isTransient: true, ex));
         }
     }
 
@@ -170,7 +174,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
             var message = await _transport.ReceiveAsync(cancellationToken);
             if (message is null)
             {
-                Fail(new TranscriptionException("Die Verbindung zur OpenAI-Transkription wurde unerwartet geschlossen."));
+                Fail(new TranscriptionException("Die Verbindung zur OpenAI-Transkription wurde unterbrochen.", isTransient: true));
                 return;
             }
 
@@ -233,7 +237,9 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
 
             case ServerEvent.Error error:
                 _log.Warn($"Realtime API error: {error.Code}.");
-                Fail(new TranscriptionException($"OpenAI-Fehler: {error.Message} ({error.Code})"));
+                Fail(new TranscriptionException(
+                    OpenAIErrors.UserMessage(error.Code, error.Message) + $" ({error.Code})",
+                    OpenAIErrors.IsTransient(error.Code)));
                 break;
 
             case ServerEvent.Other other:
@@ -267,7 +273,7 @@ internal sealed class RealtimeTranscriptionSession : ITranscriptionSession
         var result = string.Join(" ", parts);
         if (result.Length == 0)
         {
-            _log.Warn($"Empty transcript: items={_itemOrder.Count}, committed={_committedItems.Count}, " +
+            _log.Debug($"Empty transcript: items={_itemOrder.Count}, committed={_committedItems.Count}, " +
                       $"completed={_completedItems.Count}, commits={_commitsSent}, audioBytes={_audioBytesAppended}.");
         }
 
