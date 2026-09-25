@@ -77,6 +77,10 @@ public partial class App : Application
         {
             OpenSettings(SettingsPage.OpenAI);
         }
+        else if (e.Args.Contains("--settings", StringComparer.OrdinalIgnoreCase))
+        {
+            OpenSettings();
+        }
         else
         {
             _tray.ShowInfo(IsActive

@@ -25,6 +25,8 @@ public sealed class HotkeyBox : TextBox
 
     public HotkeyBox()
     {
+        // Subclasses do not pick up the implicit (Fluent) TextBox style by themselves.
+        SetResourceReference(StyleProperty, typeof(TextBox));
         IsReadOnly = true;
         IsReadOnlyCaretVisible = false;
         Cursor = Cursors.Hand;

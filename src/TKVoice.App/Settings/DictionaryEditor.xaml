@@ -29,7 +29,10 @@
 
         <TextBlock x:Name="ErrorText" Grid.Row="2" Style="{StaticResource Error}" Visibility="Collapsed" />
 
-        <ListBox x:Name="TermList" Grid.Row="3" Margin="0,12,0,0" MouseDoubleClick="OnEdit" SelectionChanged="OnSelectionChanged" />
+        <Border Grid.Row="3" Style="{StaticResource Card}" Padding="4" Margin="0,12,0,0">
+            <ListBox x:Name="TermList" MouseDoubleClick="OnEdit" SelectionChanged="OnSelectionChanged"
+                     BorderThickness="0" Background="Transparent" ItemContainerStyle="{StaticResource NavItem}" />
+        </Border>
 
         <DockPanel Grid.Row="4" Margin="0,12,0,0" LastChildFill="False">
             <TextBlock x:Name="CountText" VerticalAlignment="Center" Style="{StaticResource Hint}" />

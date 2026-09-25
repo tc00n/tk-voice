@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
 using System.Windows.Forms;
-using TKVoice.App.Settings;
 using TKVoice.Core.Abstractions;
 using TKVoice.Core.Processing;
 using TKVoice.Infrastructure;
@@ -21,8 +20,8 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
     private readonly NotifyIcon _notifyIcon;
     private readonly Dictionary<DictationState, Icon> _icons;
     private readonly Icon _pausedIcon;
-    private readonly ToolStripMenuItem _activeItem;
-    private readonly ToolStripMenuItem _smartModeItem;
+    private readonly TrayMenu _menu;
+    private readonly ProcessingModeState _mode;
     private DictationState _state = DictationState.Idle;
     private bool _active = true;
 
@@ -36,29 +35,21 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
         };
         _pausedIcon = CreateIcon(Color.FromArgb(0x8A, 0x8A, 0x8A));
 
-        var menu = new ContextMenuStrip();
-        _activeItem = new ToolStripMenuItem("TK Voice aktiv", null, (_, _) => App.Current.SetActive(!_active));
-        _smartModeItem = new ToolStripMenuItem("Smart Mode (aus = Raw Mode)", null, (_, _) => App.Current.ToggleMode())
-        {
-            Checked = mode.Current == ProcessingMode.Smart,
-        };
-        mode.Changed += (_, current) => OnUiThread(() => _smartModeItem.Checked = current == ProcessingMode.Smart);
-
-        menu.Items.Add(_activeItem);
-        menu.Items.Add(_smartModeItem);
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Einstellungen …", null, (_, _) => App.Current.OpenSettings());
-        menu.Items.Add("Wörterbuch …", null, (_, _) => App.Current.OpenSettings(SettingsPage.Dictionary));
-        menu.Items.Add("Logs öffnen", null, (_, _) => OpenLogs(log));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Beenden", null, (_, _) => Application.Current.Shutdown());
+        _mode = mode;
+        _menu = new TrayMenu(() => App.Current.SetActive(!_active), () => App.Current.ToggleMode());
 
         _notifyIcon = new NotifyIcon
         {
             Icon = _icons[DictationState.Idle],
             Text = "TK Voice",
-            ContextMenuStrip = menu,
             Visible = true,
+        };
+        _notifyIcon.MouseUp += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                _menu.Show(_active, _mode.Current == ProcessingMode.Smart);
+            }
         };
         _notifyIcon.DoubleClick += (_, _) => App.Current.OpenSettings();
     }
@@ -72,7 +63,6 @@ internal sealed class TrayIcon : IUserNotifier, IDisposable
     public void SetActive(bool active) => OnUiThread(() =>
     {
         _active = active;
-        _activeItem.Checked = active;
         UpdateIcon();
     });
 

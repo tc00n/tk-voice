@@ -242,3 +242,17 @@ erreichbarer Server → 3 Versuche mit Replay, klare Fehlermeldung nach 2,6 s.
   `GET /v1/models/{id}`. Der separate API-Key-Dialog entfällt; ohne Key öffnen sich beim Start die Einstellungen.
 - **App-Regeln:** „Anwendung erkennen“ gibt 3 s Zeit, zum Zielprogramm zu wechseln, und übernimmt dessen
   Prozessnamen.
+
+## ADR-018 – Fluent-Design (Windows 11)
+
+- WPF-Standardsteuerelemente sehen ohne Theme wie Windows 7 aus. `Application.ThemeMode="System"`
+  aktiviert das in .NET 9+ eingebaute Fluent-Theme inkl. Hell/Dunkel nach Windows-Einstellung – ohne
+  Fremdbibliothek. Deshalb keine impliziten Control-Styles in `App.xaml` (sie würden Fluent ersetzen);
+  eigene Farben nur über Theme-Ressourcen (`DynamicResource …FillColor…Brush`).
+- Einstellungsfenster im Stil der Windows-Einstellungen: Navigation links (Akzentstrich statt Vollfläche),
+  Einstellungen als Karten mit Symbol, Titel, Beschreibung und Steuerelement; Schalter als eigens
+  gestylte CheckBox (WPF hat keinen ToggleSwitch).
+- Tray-Menü als WPF-`ContextMenu` (Fluent) statt WinForms-`ContextMenuStrip`; ein unsichtbares
+  Host-Fenster sorgt dafür, dass es sich bei Klick daneben schließt.
+- Von `TextBox` abgeleitete Controls übernehmen den Fluent-Style nicht automatisch
+  (`SetResourceReference(StyleProperty, typeof(TextBox))`).

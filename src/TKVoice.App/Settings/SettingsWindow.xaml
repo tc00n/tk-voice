@@ -3,286 +3,468 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:TKVoice.App.Settings"
         Title="TK Voice – Settings"
-        Width="780" Height="600" MinWidth="640" MinHeight="480"
-        WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI" FontSize="13"
-        Background="#FAFAFA">
+        Width="1000" Height="700" MinWidth="760" MinHeight="520"
+        WindowStartupLocation="CenterScreen">
     <Window.Resources>
-        <Style TargetType="TabItem">
-            <Setter Property="Padding" Value="14,8" />
-            <Setter Property="MinWidth" Value="150" />
-            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <!-- Pages are switched by the navigation list; the tab headers themselves are hidden. -->
+        <Style x:Key="HiddenTab" TargetType="TabItem">
+            <Setter Property="Visibility" Value="Collapsed" />
         </Style>
         <Style x:Key="Page" TargetType="ScrollViewer">
             <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
-            <Setter Property="Padding" Value="24,20" />
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled" />
+            <Setter Property="Padding" Value="36,24,36,24" />
         </Style>
-        <Style x:Key="Row" TargetType="Grid">
-            <Setter Property="Margin" Value="0,0,0,10" />
+        <Style x:Key="PageContent" TargetType="StackPanel">
+            <Setter Property="MaxWidth" Value="820" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style x:Key="NavIcon" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource IconFont}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Width" Value="28" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="SmallField" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Width" Value="90" />
+            <Setter Property="HorizontalContentAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
     </Window.Resources>
 
-    <DockPanel>
-        <Border DockPanel.Dock="Bottom" Background="#F0F0F0" BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="16,10">
-            <DockPanel LastChildFill="False">
-                <TextBlock x:Name="ValidationText" VerticalAlignment="Center" Style="{StaticResource Error}" Margin="0" MaxWidth="480" />
-                <Button DockPanel.Dock="Right" Content="Abbrechen" IsCancel="True" Margin="8,0,0,0" Click="OnCancel" />
-                <Button DockPanel.Dock="Right" Content="Speichern" IsDefault="True" Click="OnSave" />
-            </DockPanel>
-        </Border>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
 
-        <TabControl x:Name="Tabs" TabStripPlacement="Left" BorderThickness="0" Background="White">
-            <!-- General -->
-            <TabItem Header="Allgemein" Tag="General">
-                <ScrollViewer Style="{StaticResource Page}">
-                    <StackPanel>
-                        <TextBlock Text="Allgemein" Style="{StaticResource SectionTitle}" />
-                        <CheckBox x:Name="ActiveBox" Content="TK Voice aktiv (sonst pausiert: Hotkeys werden ignoriert)" />
-                        <CheckBox x:Name="AutostartBox" Content="Mit Windows starten (im Hintergrund)" />
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Hotkeys -->
-            <TabItem Header="Hotkeys" Tag="Hotkeys">
-                <ScrollViewer Style="{StaticResource Page}">
-                    <StackPanel>
-                        <TextBlock Text="Hotkeys" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,14">
-                            In ein Feld klicken und die Tastenkombination drücken. Entf deaktiviert einen Hotkey.
-                            Mit dem Standard wird Hands-free gestartet, indem man bei gehaltenem Push-to-talk die Leertaste dazunimmt.
-                        </TextBlock>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Push-to-talk" Style="{StaticResource FieldLabel}" />
-                            <local:HotkeyBox x:Name="PushToTalkBox" Grid.Column="1" Margin="0,4" />
-                            <Button Grid.Column="2" Content="Standard" Margin="8,4,0,4" Tag="PushToTalk" Click="OnResetHotkey" />
-
-                            <TextBlock Grid.Row="1" Text="Hands-free Start/Stopp" Style="{StaticResource FieldLabel}" />
-                            <local:HotkeyBox x:Name="HandsFreeBox" Grid.Row="1" Grid.Column="1" Margin="0,4" />
-                            <Button Grid.Row="1" Grid.Column="2" Content="Standard" Margin="8,4,0,4" Tag="HandsFree" Click="OnResetHotkey" />
-
-                            <TextBlock Grid.Row="2" Text="Smart/Raw umschalten" Style="{StaticResource FieldLabel}" />
-                            <local:HotkeyBox x:Name="ToggleModeBox" Grid.Row="2" Grid.Column="1" Margin="0,4" />
-                            <Button Grid.Row="2" Grid.Column="2" Content="Standard" Margin="8,4,0,4" Tag="ToggleSmartRaw" Click="OnResetHotkey" />
-
-                            <TextBlock Grid.Row="3" Text="Begriff zum Wörterbuch" Style="{StaticResource FieldLabel}" />
-                            <local:HotkeyBox x:Name="AddToDictionaryBox" Grid.Row="3" Grid.Column="1" Margin="0,4" />
-                            <Button Grid.Row="3" Grid.Column="2" Content="Standard" Margin="8,4,0,4" Tag="AddToDictionary" Click="OnResetHotkey" />
-                        </Grid>
-                        <TextBlock x:Name="HotkeyWarnings" Foreground="{StaticResource WarningText}" TextWrapping="Wrap" Margin="0,12,0,0" />
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Audio -->
-            <TabItem Header="Audio" Tag="Audio">
-                <ScrollViewer Style="{StaticResource Page}">
-                    <StackPanel>
-                        <TextBlock Text="Audio" Style="{StaticResource SectionTitle}" />
-                        <Grid Style="{StaticResource Row}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Mikrofon" Style="{StaticResource FieldLabel}" />
-                            <ComboBox x:Name="MicrophoneBox" Grid.Column="1" />
-                        </Grid>
-                        <CheckBox x:Name="SoundsBox" Content="Start- und Stoppsignal abspielen" />
-                        <Grid Style="{StaticResource Row}" Margin="0,6,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Lautstärke" Style="{StaticResource FieldLabel}" />
-                            <Slider x:Name="VolumeSlider" Grid.Column="1" Minimum="0" Maximum="1" TickFrequency="0.1" VerticalAlignment="Center" />
-                            <Button Grid.Column="2" Content="Testen" Margin="8,0,0,0" Click="OnTestSound" />
-                        </Grid>
-                        <Grid Style="{StaticResource Row}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="90" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Hands-free: Ende nach Stille" Style="{StaticResource FieldLabel}" />
-                            <TextBox x:Name="SilenceTimeoutBox" Grid.Column="1" />
-                            <TextBlock Grid.Column="2" Text="Sekunden (0 = aus)" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
-                        </Grid>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Processing -->
-            <TabItem Header="Verarbeitung" Tag="Processing">
-                <ScrollViewer Style="{StaticResource Page}">
-                    <StackPanel>
-                        <TextBlock Text="Verarbeitung" Style="{StaticResource SectionTitle}" />
-                        <Grid Style="{StaticResource Row}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Standardmodus beim Start" Style="{StaticResource FieldLabel}" />
-                            <ComboBox x:Name="DefaultModeBox" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220">
-                                <ComboBoxItem Content="Smart – bereinigt und formatiert" Tag="Smart" />
-                                <ComboBoxItem Content="Raw – Transkript unverändert" Tag="Raw" />
-                            </ComboBox>
-                        </Grid>
-                        <Grid Style="{StaticResource Row}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="90" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Timeout Transkription" Style="{StaticResource FieldLabel}" />
-                            <TextBox x:Name="TimeoutBox" Grid.Column="1" Margin="0,4" />
-                            <TextBlock Grid.Column="2" Text="Sekunden pro Versuch" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
-                            <TextBlock Grid.Row="1" Text="Timeout Smart Processing" Style="{StaticResource FieldLabel}" />
-                            <TextBox x:Name="SmartTimeoutBox" Grid.Row="1" Grid.Column="1" Margin="0,4" />
-                            <TextBlock Grid.Row="1" Grid.Column="2" Text="Sekunden pro Versuch" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
-                            <TextBlock Grid.Row="2" Text="Wiederholungen bei Fehlern" Style="{StaticResource FieldLabel}" />
-                            <TextBox x:Name="RetriesBox" Grid.Row="2" Grid.Column="1" Margin="0,4" />
-                            <TextBlock Grid.Row="2" Grid.Column="2" Text="0 bis 5" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
-                        </Grid>
-                        <CheckBox x:Name="SkipSimpleBox" Content="Kurze, bereits saubere Sätze ohne Smart Processing einfügen (schneller)" />
-                        <CheckBox x:Name="WindowTitleBox" Content="Fenstertitel als Kontext mitsenden (kann z. B. E-Mail-Betreffe enthalten)" />
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- Dictionary -->
-            <TabItem Header="Wörterbuch" Tag="Dictionary">
-                <Border Padding="24,20">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="Wörterbuch" Style="{StaticResource SectionTitle}" />
-                        <local:DictionaryEditor x:Name="DictionaryEditor" />
-                    </DockPanel>
+        <!-- Navigation -->
+        <DockPanel Grid.RowSpan="2" Margin="12,16,4,16">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="12,0,0,20">
+                <Border Width="32" Height="32" CornerRadius="16" Background="{DynamicResource AccentFillColorDefaultBrush}">
+                    <TextBlock Text="TK" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextOnAccentFillColorPrimaryBrush}" />
                 </Border>
+                <TextBlock Text="TK Voice" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,0,0" />
+            </StackPanel>
+            <ListBox x:Name="NavList" BorderThickness="0" Background="Transparent" SelectionChanged="OnNavigate"
+                     ItemContainerStyle="{StaticResource NavItem}">
+                <ListBoxItem Tag="General"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE713;" /><TextBlock Text="Allgemein" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="Hotkeys"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE765;" /><TextBlock Text="Hotkeys" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="Audio"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE720;" /><TextBlock Text="Audio" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="Processing"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE70F;" /><TextBlock Text="Verarbeitung" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="Dictionary"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE82D;" /><TextBlock Text="Wörterbuch" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="AppRules"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE71D;" /><TextBlock Text="App-Regeln" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="OpenAI"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE753;" /><TextBlock Text="OpenAI" /></StackPanel></ListBoxItem>
+                <ListBoxItem Tag="Diagnostics"><StackPanel Orientation="Horizontal"><TextBlock Style="{StaticResource NavIcon}" Text="&#xE9D9;" /><TextBlock Text="Diagnose" /></StackPanel></ListBoxItem>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Pages -->
+        <TabControl x:Name="Tabs" Grid.Column="1" BorderThickness="0" Background="Transparent" Padding="0"
+                    ItemContainerStyle="{StaticResource HiddenTab}">
+
+            <TabItem Tag="General">
+                <ScrollViewer Style="{StaticResource Page}">
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="Allgemein" Style="{StaticResource PageTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE768;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="TK Voice aktiv" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Pausiert werden alle Hotkeys ignoriert. Auch über das Tray-Menü umschaltbar." />
+                                </StackPanel>
+                                <CheckBox x:Name="ActiveBox" Grid.Column="2" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE7E8;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Mit Windows starten" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="TK Voice startet im Hintergrund, Hotkeys sind sofort aktiv." />
+                                </StackPanel>
+                                <CheckBox x:Name="AutostartBox" Grid.Column="2" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
-            <!-- App rules -->
-            <TabItem Header="App-Regeln" Tag="AppRules">
-                <Border Padding="24,20">
-                    <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Text="App-Regeln" Style="{StaticResource SectionTitle}" />
-                        <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="0,0,0,12">
-                            Stil des Smart Mode je Programm. Erkannt wird nur der Programmname, nie Inhalte.
-                            Programme ohne Regel verwenden den normalen Smart Mode.
+            <TabItem Tag="Hotkeys">
+                <ScrollViewer Style="{StaticResource Page}">
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="Hotkeys" Style="{StaticResource PageTitle}" />
+                        <TextBlock Style="{StaticResource Hint}" Margin="2,0,0,16">
+                            In ein Feld klicken und die Tastenkombination drücken. Entf deaktiviert einen Hotkey, Esc bricht ab.
                         </TextBlock>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="180" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <DockPanel>
-                                <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                                    <Button Content="Neue Regel" Click="OnAddRule" Margin="0,0,0,6" />
-                                    <Button x:Name="DeleteRuleButton" Content="Regel löschen" Click="OnDeleteRule" Margin="0,0,0,6" />
-                                    <Button Content="Standardregeln" Click="OnResetRules" ToolTip="Ersetzt alle Regeln durch die mitgelieferten Standardregeln." />
+
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="200" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE720;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Push-to-talk" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Halten zum Sprechen, loslassen zum Einfügen." />
                                 </StackPanel>
-                                <ListBox x:Name="RuleList" DisplayMemberPath="Name" SelectionChanged="OnRuleSelected" />
-                            </DockPanel>
-                            <StackPanel x:Name="RuleEditor" Grid.Column="1" Margin="16,0,0,0">
-                                <TextBlock Text="Name" Margin="0,0,0,4" />
+                                <local:HotkeyBox x:Name="PushToTalkBox" Grid.Column="2" VerticalAlignment="Center" />
+                                <Button Grid.Column="3" Content="Standard" Margin="8,0,0,0" Tag="PushToTalk" Click="OnResetHotkey" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="200" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE72E;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Hands-free Start/Stopp" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Freihändig diktieren. Standard: bei gehaltenem Push-to-talk die Leertaste dazunehmen." />
+                                </StackPanel>
+                                <local:HotkeyBox x:Name="HandsFreeBox" Grid.Column="2" VerticalAlignment="Center" />
+                                <Button Grid.Column="3" Content="Standard" Margin="8,0,0,0" Tag="HandsFree" Click="OnResetHotkey" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="200" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE8AB;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Smart/Raw umschalten" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Zwischen Bereinigung und unverändertem Transkript wechseln." />
+                                </StackPanel>
+                                <local:HotkeyBox x:Name="ToggleModeBox" Grid.Column="2" VerticalAlignment="Center" />
+                                <Button Grid.Column="3" Content="Standard" Margin="8,0,0,0" Tag="ToggleSmartRaw" Click="OnResetHotkey" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="200" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE82D;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Begriff zum Wörterbuch" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Markierten Begriff ins Wörterbuch übernehmen." />
+                                </StackPanel>
+                                <local:HotkeyBox x:Name="AddToDictionaryBox" Grid.Column="2" VerticalAlignment="Center" />
+                                <Button Grid.Column="3" Content="Standard" Margin="8,0,0,0" Tag="AddToDictionary" Click="OnResetHotkey" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <TextBlock x:Name="HotkeyWarnings" Style="{StaticResource Warning}" Margin="2,12,0,0" />
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Tag="Audio">
+                <ScrollViewer Style="{StaticResource Page}">
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="Audio" Style="{StaticResource PageTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="280" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE720;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Mikrofon" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Wird bei jeder Aufnahme neu gesucht – Umstecken ohne Neustart." />
+                                </StackPanel>
+                                <ComboBox x:Name="MicrophoneBox" Grid.Column="2" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="Signaltöne" Style="{StaticResource GroupTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE767;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Start- und Stoppsignal" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Kurzer Ton, wenn die Aufnahme beginnt und endet." />
+                                </StackPanel>
+                                <CheckBox x:Name="SoundsBox" Grid.Column="2" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="200" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE994;" />
+                                <TextBlock Grid.Column="1" Style="{StaticResource CardTitle}" Text="Lautstärke" VerticalAlignment="Center" />
+                                <Slider x:Name="VolumeSlider" Grid.Column="2" Minimum="0" Maximum="1" VerticalAlignment="Center" />
+                                <Button Grid.Column="3" Content="Testen" Margin="12,0,0,0" Click="OnTestSound" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="Hands-free" Style="{StaticResource GroupTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE916;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Automatisch beenden nach Stille" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Nur für Hands-free. 0 = aus." />
+                                </StackPanel>
+                                <TextBox x:Name="SilenceTimeoutBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="Sekunden" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Tag="Processing">
+                <ScrollViewer Style="{StaticResource Page}">
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="Verarbeitung" Style="{StaticResource PageTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="280" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE945;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Standardmodus" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Modus beim Start von TK Voice." />
+                                </StackPanel>
+                                <ComboBox x:Name="DefaultModeBox" Grid.Column="2" VerticalAlignment="Center">
+                                    <ComboBoxItem Content="Smart – bereinigt und formatiert" Tag="Smart" />
+                                    <ComboBoxItem Content="Raw – Transkript unverändert" Tag="Raw" />
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE916;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Kurze saubere Sätze direkt einfügen" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Überspringt Smart Processing, wenn nichts zu bereinigen ist – schneller." />
+                                </StackPanel>
+                                <CheckBox x:Name="SkipSimpleBox" Grid.Column="2" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE737;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Fenstertitel als Kontext senden" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Kann z. B. E-Mail-Betreffe enthalten. Standardmäßig aus." />
+                                </StackPanel>
+                                <CheckBox x:Name="WindowTitleBox" Grid.Column="2" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="Zeitlimits und Wiederholungen" Style="{StaticResource GroupTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="80" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE823;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Timeout Transkription" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Wartezeit pro Versuch auf das Transkript." />
+                                </StackPanel>
+                                <TextBox x:Name="TimeoutBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="Sekunden" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="80" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE823;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Timeout Smart Processing" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Danach wird der Rohtext eingefügt." />
+                                </StackPanel>
+                                <TextBox x:Name="SmartTimeoutBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                                <TextBlock Grid.Column="3" Text="Sekunden" Style="{StaticResource Hint}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="80" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE72C;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Wiederholungen bei Fehlern" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Bei Netzwerk- und Serverfehlern, 0 bis 5." />
+                                </StackPanel>
+                                <TextBox x:Name="RetriesBox" Grid.Column="2" Style="{StaticResource SmallField}" />
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Tag="Dictionary">
+                <DockPanel Margin="36,24,36,24">
+                    <TextBlock DockPanel.Dock="Top" Text="Wörterbuch" Style="{StaticResource PageTitle}" />
+                    <local:DictionaryEditor x:Name="DictionaryEditor" MaxWidth="820" HorizontalAlignment="Stretch" />
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Tag="AppRules">
+                <DockPanel Margin="36,24,36,24">
+                    <TextBlock DockPanel.Dock="Top" Text="App-Regeln" Style="{StaticResource PageTitle}" />
+                    <TextBlock DockPanel.Dock="Top" Style="{StaticResource Hint}" Margin="2,0,0,16">
+                        Stil des Smart Mode je Programm. Erkannt wird nur der Programmname, nie Inhalte.
+                        Programme ohne Regel verwenden den normalen Smart Mode.
+                    </TextBlock>
+                    <Grid MaxWidth="820" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="200" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <DockPanel>
+                            <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                                <Button Content="Neue Regel" Click="OnAddRule" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
+                                <Button x:Name="DeleteRuleButton" Content="Regel löschen" Click="OnDeleteRule" HorizontalAlignment="Stretch" Margin="0,0,0,6" />
+                                <Button Content="Standardregeln" Click="OnResetRules" HorizontalAlignment="Stretch"
+                                        ToolTip="Ersetzt alle Regeln durch die mitgelieferten Standardregeln." />
+                            </StackPanel>
+                            <Border Style="{StaticResource Card}" Padding="4" Margin="0">
+                                <ListBox x:Name="RuleList" DisplayMemberPath="Name" SelectionChanged="OnRuleSelected" BorderThickness="0" Background="Transparent"
+                                         ItemContainerStyle="{StaticResource NavItem}" />
+                            </Border>
+                        </DockPanel>
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="16,0,0,0" VerticalAlignment="Top">
+                            <StackPanel x:Name="RuleEditor">
+                                <TextBlock Text="Name" Margin="0,0,0,6" />
                                 <TextBox x:Name="RuleNameBox" TextChanged="OnRuleEdited" />
-                                <TextBlock Text="Programme (Prozessnamen, durch Komma getrennt)" Margin="0,12,0,4" />
+                                <TextBlock Text="Programme" Margin="0,16,0,2" />
+                                <TextBlock Text="Prozessnamen, durch Komma getrennt" Style="{StaticResource CardDescription}" Margin="0,0,0,6" />
                                 <DockPanel>
                                     <Button DockPanel.Dock="Right" x:Name="DetectAppButton" Content="Anwendung erkennen" Margin="8,0,0,0" Click="OnDetectApp"
                                             ToolTip="Nach dem Klick 3 Sekunden Zeit, um zum gewünschten Programm zu wechseln." />
                                     <TextBox x:Name="RuleProcessesBox" TextChanged="OnRuleEdited" />
                                 </DockPanel>
-                                <TextBlock Text="Stilanweisung für den Smart Mode" Margin="0,12,0,4" />
+                                <TextBlock Text="Stilanweisung für den Smart Mode" Margin="0,16,0,6" />
                                 <TextBox x:Name="RuleStyleBox" TextChanged="OnRuleEdited" AcceptsReturn="True" TextWrapping="Wrap"
-                                         Height="150" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" />
+                                         Height="170" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" />
                             </StackPanel>
-                        </Grid>
-                    </DockPanel>
-                </Border>
+                        </Border>
+                    </Grid>
+                </DockPanel>
             </TabItem>
 
-            <!-- OpenAI -->
-            <TabItem Header="OpenAI" Tag="OpenAI">
+            <TabItem Tag="OpenAI">
                 <ScrollViewer Style="{StaticResource Page}">
-                    <StackPanel>
-                        <TextBlock Text="OpenAI" Style="{StaticResource SectionTitle}" />
-                        <TextBlock Text="API Key" Margin="0,0,0,4" />
-                        <PasswordBox x:Name="ApiKeyBox" />
-                        <TextBlock x:Name="ApiKeyHint" Style="{StaticResource Hint}" Margin="0,4,0,0" />
-                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                            <Button x:Name="TestConnectionButton" Content="Verbindung testen" Click="OnTestConnection" />
-                        </StackPanel>
-                        <TextBlock x:Name="ConnectionResult" TextWrapping="Wrap" Margin="0,8,0,16" />
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="OpenAI" Style="{StaticResource PageTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource CardIcon}" Text="&#xE8D7;" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Style="{StaticResource CardTitle}" Text="API Key" />
+                                        <TextBlock x:Name="ApiKeyHint" Style="{StaticResource CardDescription}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="36,12,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <PasswordBox x:Name="ApiKeyBox" />
+                                    <Button x:Name="TestConnectionButton" Grid.Column="1" Content="Verbindung testen" Margin="8,0,0,0" Click="OnTestConnection" />
+                                </Grid>
+                                <TextBlock x:Name="ConnectionResult" TextWrapping="Wrap" Margin="36,8,0,0" />
+                            </StackPanel>
+                        </Border>
 
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Transkriptionsmodell" Style="{StaticResource FieldLabel}" />
-                            <TextBox x:Name="TranscriptionModelBox" Grid.Column="1" Margin="0,4" />
-                            <TextBlock Grid.Row="1" Text="Smart-Processing-Modell" Style="{StaticResource FieldLabel}" />
-                            <TextBox x:Name="SmartModelBox" Grid.Row="1" Grid.Column="1" Margin="0,4" />
-                            <TextBlock Grid.Row="2" Text="Smart Processing: Fast mode" Style="{StaticResource FieldLabel}" />
-                            <CheckBox x:Name="FastModeBox" Grid.Row="2" Grid.Column="1" Content="schneller und gleichmäßiger, doppelter Preis" VerticalAlignment="Center" />
-                            <TextBlock Grid.Row="3" Text="Sprachen (ISO-Codes)" Style="{StaticResource FieldLabel}" />
-                            <TextBox x:Name="LanguagesBox" Grid.Row="3" Grid.Column="1" Margin="0,4" ToolTip="z. B. de, en – leer = automatisch" />
-                        </Grid>
+                        <TextBlock Text="Modelle" Style="{StaticResource GroupTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="280" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE720;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Transkription" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Realtime-Modell für Speech-to-Text." />
+                                </StackPanel>
+                                <TextBox x:Name="TranscriptionModelBox" Grid.Column="2" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="280" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE70F;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Smart Processing" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Textmodell für Bereinigung und Formatierung." />
+                                </StackPanel>
+                                <TextBox x:Name="SmartModelBox" Grid.Column="2" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE945;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Fast mode für Smart Processing" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Schneller und gleichmäßiger, doppelter Preis (ca. 0,02 Cent pro Diktat)." />
+                                </StackPanel>
+                                <CheckBox x:Name="FastModeBox" Grid.Column="2" Style="{StaticResource ToggleSwitch}" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="280" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE775;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Sprachen" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="ISO-Codes als Hinweis, z. B. „de, en“. Leer = automatisch." />
+                                </StackPanel>
+                                <TextBox x:Name="LanguagesBox" Grid.Column="2" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Diagnostics -->
-            <TabItem Header="Diagnose" Tag="Diagnostics">
+            <TabItem Tag="Diagnostics">
                 <ScrollViewer Style="{StaticResource Page}">
-                    <StackPanel>
-                        <TextBlock Text="Diagnose" Style="{StaticResource SectionTitle}" />
-                        <Grid Style="{StaticResource Row}">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="220" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Log-Level" Style="{StaticResource FieldLabel}" />
-                            <ComboBox x:Name="LogLevelBox" Grid.Column="1" HorizontalAlignment="Left" MinWidth="160">
-                                <ComboBoxItem Content="Debug" />
-                                <ComboBoxItem Content="Info" />
-                                <ComboBoxItem Content="Warn" />
-                                <ComboBoxItem Content="Error" />
-                            </ComboBox>
-                        </Grid>
-                        <TextBlock Style="{StaticResource Hint}" Margin="0,0,0,12">
-                            Logs enthalten nur technische Angaben (Zustände, Latenzen, Fehlercodes) – nie Audio, Transkripte,
-                            eingefügte Texte oder den API Key.
-                        </TextBlock>
-                        <StackPanel Orientation="Horizontal">
-                            <Button Content="Logs öffnen" Click="OnOpenLogs" />
-                            <Button Content="Logs löschen" Margin="8,0,0,0" Click="OnDeleteLogs" />
-                        </StackPanel>
-                        <TextBlock x:Name="LogsResult" Style="{StaticResource Hint}" Margin="0,8,0,0" />
+                    <StackPanel Style="{StaticResource PageContent}">
+                        <TextBlock Text="Diagnose" Style="{StaticResource PageTitle}" />
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="180" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE9D9;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Log-Level" />
+                                    <TextBlock Style="{StaticResource CardDescription}" Text="Logs enthalten nur technische Angaben – nie Audio, Transkripte, Texte oder den API Key." />
+                                </StackPanel>
+                                <ComboBox x:Name="LogLevelBox" Grid.Column="2" VerticalAlignment="Center">
+                                    <ComboBoxItem Content="Debug" />
+                                    <ComboBoxItem Content="Info" />
+                                    <ComboBoxItem Content="Warn" />
+                                    <ComboBoxItem Content="Error" />
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+                        <Border Style="{StaticResource Card}">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource CardIcon}" Text="&#xE8B7;" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="0,0,12,0">
+                                    <TextBlock Style="{StaticResource CardTitle}" Text="Logdateien" />
+                                    <TextBlock x:Name="LogsResult" Style="{StaticResource CardDescription}" Text="%LOCALAPPDATA%\TK Voice\logs" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Content="Öffnen" Click="OnOpenLogs" />
+                                    <Button Content="Löschen" Margin="8,0,0,0" Click="OnDeleteLogs" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
         </TabControl>
-    </DockPanel>
+
+        <!-- Footer -->
+        <Border Grid.Row="1" Grid.Column="1" Padding="36,12,36,16">
+            <DockPanel LastChildFill="False">
+                <TextBlock x:Name="ValidationText" DockPanel.Dock="Left" VerticalAlignment="Center" Style="{StaticResource Error}" Margin="0" MaxWidth="460" />
+                <Button DockPanel.Dock="Right" Content="Abbrechen" IsCancel="True" Margin="8,0,0,0" MinWidth="110" Click="OnCancel" />
+                <Button DockPanel.Dock="Right" Content="Speichern" IsDefault="True" MinWidth="110" Click="OnSave"
+                        Style="{DynamicResource AccentButtonStyle}" />
+            </DockPanel>
+        </Border>
+    </Grid>
 </Window>

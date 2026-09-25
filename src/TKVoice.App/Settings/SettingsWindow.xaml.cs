@@ -53,7 +53,15 @@ public partial class SettingsWindow : Window
     }
 
     internal void ShowPage(SettingsPage page) =>
-        Tabs.SelectedItem = Tabs.Items.Cast<TabItem>().First(tab => (string)tab.Tag == page.ToString());
+        NavList.SelectedItem = NavList.Items.Cast<ListBoxItem>().First(item => (string)item.Tag == page.ToString());
+
+    private void OnNavigate(object sender, SelectionChangedEventArgs e)
+    {
+        if (NavList.SelectedItem is ListBoxItem { Tag: string page })
+        {
+            Tabs.SelectedItem = Tabs.Items.Cast<TabItem>().First(tab => (string)tab.Tag == page);
+        }
+    }
 
     // General
 
